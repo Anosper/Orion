@@ -1020,51 +1020,40 @@ function rnd(arr){return arr[Math.floor(Math.random()*arr.length)];}
 function rndInt(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
 function fmtBRL(v){return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
 function fmtDate(d){
+  console.log("🔥 NOVA FMTDATE ESTÁ SENDO USADA", d);
+
   if (!d) return '—';
 
-  // Firebase Timestamp
   if (d?.toDate) {
     d = d.toDate();
   }
 
-  // Já é Date
   if (d instanceof Date) {
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('pt-BR');
   }
 
-  // String no formato "19 ago 2026"
   if (typeof d === 'string') {
     const meses = {
-      jan: 0,
-      fev: 1,
-      mar: 2,
-      abr: 3,
-      mai: 4,
-      jun: 5,
-      jul: 6,
-      ago: 7,
-      set: 8,
-      out: 9,
-      nov: 10,
-      dez: 11
+      jan: 0, fev: 1, mar: 2, abr: 3,
+      mai: 4, jun: 5, jul: 6, ago: 7,
+      set: 8, out: 9, nov: 10, dez: 11
     };
 
     const partes = d.trim().toLowerCase().split(/\s+/);
 
     if (partes.length === 3 && meses[partes[1]] !== undefined) {
-      const dia = Number(partes[0]);
-      const mes = meses[partes[1]];
-      const ano = Number(partes[2]);
-
-      const data = new Date(ano, mes, dia);
+      const data = new Date(
+        Number(partes[2]),
+        meses[partes[1]],
+        Number(partes[0])
+      );
 
       if (!isNaN(data.getTime())) {
         return data.toLocaleDateString('pt-BR');
       }
     }
 
-    // Tenta formatos de data comuns
     const data = new Date(d);
 
     if (!isNaN(data.getTime())) {
