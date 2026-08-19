@@ -1083,8 +1083,8 @@ function iniciarListenerProcessos() {
 
       PROCESSOS = lista;
 
-      if (currentUser && typeof map[currentView] === 'function') {
-        map[currentView]();
+      if (currentUser) {
+      navigate(currentView);
       }
 
     }
