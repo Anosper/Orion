@@ -1158,6 +1158,33 @@ const STAGE_ORDER = ['contato','proposta','fechada','contrato','entrada'];
 
 let PROCESSOS = [];
 
+let unsubscribeUsuarios = null;
+
+function iniciarListenerUsuarios(){
+
+  if(unsubscribeUsuarios){
+    unsubscribeUsuarios();
+    unsubscribeUsuarios = null;
+  }
+
+  unsubscribeUsuarios = FirebaseAPI.listen(
+    'usuarios',
+    lista => {
+
+      console.log('👥 Usuários recebidos do Firebase:', lista);
+
+      USERS = lista;
+
+      // Se estamos na tela de usuários,
+      // atualiza a tabela automaticamente.
+      if(currentView === 'usuarios'){
+        renderUsuarios();
+      }
+
+    }
+  );
+}
+
 let unsubscribeProcessos = null;
 
 function iniciarListenerProcessos() {
@@ -1197,33 +1224,6 @@ function iniciarListenerProcessos() {
     }
   );
 
-}
-
-let unsubscribeUsuarios = null;
-
-function iniciarListenerUsuarios(){
-
-  if(unsubscribeUsuarios){
-    unsubscribeUsuarios();
-    unsubscribeUsuarios = null;
-  }
-
-  unsubscribeUsuarios = FirebaseAPI.listen(
-    'usuarios',
-    lista => {
-
-      console.log('👥 Usuários recebidos do Firebase:', lista);
-
-      USERS = lista;
-
-      // Se estamos na tela de usuários,
-      // atualiza a tabela automaticamente.
-      if(currentView === 'usuarios'){
-        renderUsuarios();
-      }
-
-    }
-  );
 }
 
 /* ---------------- Processos ocultados individualmente (por usuário) ----------------
