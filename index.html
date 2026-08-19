@@ -1177,14 +1177,81 @@ function iniciarListenerUsuarios(){
 
   unsubscribeUsuarios = FirebaseAPI.listen(
     'usuarios',
-    lista => {
+    async lista => {
 
-      console.log('👥 Usuários recebidos do Firebase:', lista);
+      console.log(
+        '👥 Usuários recebidos do Firebase:',
+        lista
+      );
 
       USERS = lista;
 
-      // Se estamos na tela de usuários,
-      // atualiza a tabela automaticamente.
+
+      // ==========================================================
+      // VERIFICA SE O USUÁRIO ATUAL AINDA EXISTE NO FIRESTORE
+      // ==========================================================
+
+      if(currentUser){
+
+        const usuarioAtual = lista.find(
+          u => u.id === currentUser.id
+        );
+
+        if(!usuarioAtual){
+
+          console.warn(
+            '🚨 O usuário atual foi excluído do sistema.'
+          );
+
+          try{
+
+            await signOut(auth);
+
+          }catch(erro){
+
+            console.error(
+              'Erro ao encerrar sessão:',
+              erro
+            );
+
+          }
+
+          // Limpa o usuário atual
+          currentUser = null;
+
+          // Volta para a tela de login
+          document
+            .getElementById('main-screen')
+            ?.classList.add('hidden');
+
+          document
+            .getElementById('login-screen')
+            ?.classList.remove('hidden');
+
+          // Limpa os campos
+          const emailInput =
+            document.getElementById('login-email');
+
+          const passwordInput =
+            document.getElementById('login-password');
+
+          if(emailInput) emailInput.value = '';
+          if(passwordInput) passwordInput.value = '';
+
+          toast(
+            'Seu usuário foi removido do sistema.',
+            'error'
+          );
+
+          return;
+        }
+      }
+
+
+      // ==========================================================
+      // ATUALIZA A TELA DE USUÁRIOS
+      // ==========================================================
+
       if(currentView === 'usuarios'){
         renderUsuarios();
       }
