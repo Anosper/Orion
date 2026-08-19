@@ -863,12 +863,18 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
      ========================================================================= -->
 <script type="module">
   // 1) SDK modular do Firebase via CDN (ajuste a versão se preferir)
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
     getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
     onSnapshot, query, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-  // import { getAuth, signInWithEmailAndPassword, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getAuth,
+    signInWithEmailAndPassword,
+    signOut,
+    sendPasswordResetEmail,
+    createUserWithEmailAndPassword
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
   // 2) COLE AQUI a config do seu projeto (Console Firebase > Configurações do projeto > Seus apps)
   const firebaseConfig = {
@@ -882,13 +888,36 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-  // const auth = getAuth(app);
+  const auth = getAuth(app);
 
-  /* ---------------------------------------------------------------------
-     Coleções sugeridas no Firestore, espelhando os dados deste protótipo:
-     usuarios · processos (histórico fica como campos dentro de "processos")
-     credenciais_tribunais · agenda (compromissos por usuário/processo)
-     --------------------------------------------------------------------- */
+  async function criarContaFirebase(email, senha){
+
+    const appSecundario = initializeApp(
+      firebaseConfig,
+      'orion-user-manager-' + Date.now()
+    );
+
+    const authSecundario = getAuth(appSecundario);
+
+    try {
+
+      const credencial = await createUserWithEmailAndPassword(
+        authSecundario,
+        email,
+        senha
+      );
+
+      return credencial.user;
+
+    } finally {
+
+      try {
+        await signOut(authSecundario);
+      } catch(e) {}
+
+      await deleteApp(appSecundario);
+    }
+  }
 
   const FirebaseAPI = {
     // Tempo real: dispara callback(lista) sempre que a coleção mudar.
@@ -1319,39 +1348,103 @@ function hurtMascots(){
 buildMascots();
 
 async function handleLogin(e){
+
   e.preventDefault();
-  const email = document.getElementById('login-email').value.trim().toLowerCase();
+
+  const email = document
+    .getElementById('login-email')
+    .value
+    .trim()
+    .toLowerCase();
+
   const pass = document.getElementById('login-password').value;
-  // TODO(Firebase Auth): trocar a checagem local por autenticação real, ex:
-  // try { await signInWithEmailAndPassword(auth, email, pass); } catch(err){ hurtMascots(); ... }
-  const user = USERS.find(u=>u.email.toLowerCase()===email && u.senha===pass);
+
   const errBox = document.getElementById('login-error');
-  errBox.textContent = 'E-mail ou senha inválidos.';
-  if(!user){
-    errBox.style.display='block';
+
+  errBox.style.display = 'none';
+
+  try {
+
+    // Login real pelo Firebase Authentication
+    const credencial = await signInWithEmailAndPassword(
+      auth,
+      email,
+      pass
+    );
+
+    const firebaseUser = credencial.user;
+
+    // Busca o perfil correspondente no Firestore
+    const perfil = await FirebaseAPI.getAll('usuarios');
+
+    const user = perfil.find(
+      u => u.id === firebaseUser.uid
+    );
+
+    if(!user){
+
+      await signOut(auth);
+
+      errBox.textContent = 'Perfil do usuário não encontrado.';
+      errBox.style.display = 'block';
+
+      return false;
+    }
+
+    currentUser = user;
+
+    document.title = 'Orion';
+
+    document
+      .getElementById('login-screen')
+      .classList.add('hidden');
+
+    document
+      .getElementById('main-screen')
+      .classList.remove('hidden');
+
+    document.getElementById('topbar-avatar').textContent =
+      initials(user.nome);
+
+    document.getElementById('topbar-avatar').style.background =
+      avatarColor(user.nome);
+
+    document.getElementById('topbar-name').textContent =
+      user.nome;
+
+    document.getElementById('topbar-role').textContent =
+      user.perfil === 'admin'
+        ? 'Administrador'
+        : 'Usuário';
+
+    document.getElementById('gestao-wrap').style.display =
+      user.perfil === 'admin'
+        ? 'block'
+        : 'none';
+
+    goOnline(user);
+    startOnlinePresenceSimulation();
+
+    applySidebarState();
+    updateAgendaBadge();
+
+    iniciarListenerProcessos();
+
+    navigate('processos');
+
+    return false;
+
+  } catch(erro) {
+
+    console.error('Erro no login Firebase:', erro);
+
+    errBox.textContent = 'E-mail ou senha inválidos.';
+    errBox.style.display = 'block';
+
     hurtMascots();
+
     return false;
   }
-  errBox.style.display='none';
-  currentUser = user;
-  document.title = 'Orion';
-  document.getElementById('login-screen').classList.add('hidden');
-  document.getElementById('main-screen').classList.remove('hidden');
-  document.getElementById('topbar-avatar').textContent = initials(user.nome);
-  document.getElementById('topbar-avatar').style.background = avatarColor(user.nome);
-  document.getElementById('topbar-name').textContent = user.nome;
-  document.getElementById('topbar-role').textContent = user.perfil==='admin' ? 'Administrador' : 'Usuário';
-  document.getElementById('gestao-wrap').style.display = user.perfil==='admin' ? 'block':'none';
-  goOnline(user);
-  startOnlinePresenceSimulation();
-  applySidebarState();
-  updateAgendaBadge();
-
-  // 🔥 Inicia a sincronização dos processos com o Firebase
-  iniciarListenerProcessos();
-
-  navigate('processos');
-  return false;
 }
 
 function handleLogout(){
