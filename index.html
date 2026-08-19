@@ -1093,7 +1093,22 @@ function iniciarListenerProcessos() {
 
       console.log('🔥 Processos recebidos do Firebase:', lista);
 
-      PROCESSOS = lista;
+      PROCESSOS = lista.map(p => ({
+        ...p,
+
+        // Compatibilidade com o formato usado pelo Orion
+        valorCausa: typeof p.valor_causa === 'number'
+          ? p.valor_causa
+          : Number(
+              String(p.valor_causa || '')
+                .replace(/[^\d,.-]/g, '')
+                .replace(/\./g, '')
+                .replace(',', '.')
+            ),
+
+        dataDistribuicao: p.data_distribuicao,
+        reuCnpj: p.documento_reu
+      }));
 
       if (currentUser) {
       navigate(currentView);
