@@ -1029,7 +1029,19 @@ function registrarMovimentacao(p, de, para){
 function maskPhone(){return `(${rndInt(11,89)}) 9${rndInt(1000,9999)}-${rndInt(1000,9999)}`;}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d;}
 function daysFromNow(n){const d=new Date();d.setDate(d.getDate()+n);return d;}
-function isToday(d){const n=new Date();return d.getDate()===n.getDate() && d.getMonth()===n.getMonth() && d.getFullYear()===n.getFullYear();}
+function isToday(d){
+  if (!d) return false;
+
+  const data = d?.toDate ? d.toDate() : new Date(d);
+
+  if (isNaN(data.getTime())) return false;
+
+  const n = new Date();
+
+  return data.getDate() === n.getDate() &&
+         data.getMonth() === n.getMonth() &&
+         data.getFullYear() === n.getFullYear();
+}
 function initials(name){return name.split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase();}
 const AVATAR_PALETTE = ['#A9762F','#3E63A6','#2F6844','#7C3F63','#5B6472','#96661B','#1F2E52','#4B7A8F'];
 function avatarColor(name){
