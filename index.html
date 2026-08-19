@@ -3017,13 +3017,77 @@ function renderUsuarios(){
   `;
 }
 async function deleteUsuario(id){
-  const u = USERS.find(x=>x.id===id);
-  if(u.id===currentUser.id){ toast('Você não pode excluir seu próprio usuário.','error'); return; }
-  if(!confirm(`Excluir o usuário "${u.nome}"? Essa ação não pode ser desfeita.`)) return;
-  // TODO(Firebase): await FirebaseAPI.remove('usuarios', id);
-  USERS = USERS.filter(x=>x.id!==id);
-  toast(`${u.nome} foi excluído.`,'success');
-  renderUsuarios();
+
+  const u = USERS.find(x => x.id === id);
+
+  if(!u){
+    toast('Usuário não encontrado.','error');
+    return;
+  }
+
+  if(u.id === currentUser.id){
+    toast(
+      'Você não pode excluir seu próprio usuário.',
+      'error'
+    );
+    return;
+  }
+
+  if(!confirm(
+    `Excluir o usuário "${u.nome}"?\n\n` +
+    `O perfil será removido do Orion e do Firestore.\n` +
+    `A conta do Firebase Authentication continuará existindo.`
+  )){
+    return;
+  }
+
+  try{
+
+    console.log(
+      '🗑️ Excluindo perfil do usuário:',
+      u.nome,
+      u.id
+    );
+
+    // Remove somente o perfil do Firestore.
+    // NÃO remove a conta do Authentication.
+    await FirebaseAPI.remove(
+      'usuarios',
+      id
+    );
+
+    console.log(
+      '🔥 Perfil removido do Firestore:',
+      id
+    );
+
+    /*
+      NÃO fazemos:
+
+      USERS = USERS.filter(...)
+
+      porque o onSnapshot do Firebase
+      fará isso automaticamente para
+      todos os usuários conectados.
+    */
+
+    toast(
+      `${u.nome} foi excluído do Orion.`,
+      'success'
+    );
+
+  }catch(erro){
+
+    console.error(
+      '❌ Erro ao excluir usuário:',
+      erro
+    );
+
+    toast(
+      'Não foi possível excluir o usuário.',
+      'error'
+    );
+  }
 }
 async function resetSenha(id){
   const u = USERS.find(x=>x.id===id);
