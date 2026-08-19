@@ -894,7 +894,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 
     const appSecundario = initializeApp(
       firebaseConfig,
-      'orion-user-manager-' + Date.now()
+      'appSecundario'
     );
 
     const authSecundario = getAuth(appSecundario);
@@ -918,6 +918,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       await deleteApp(appSecundario);
     }
   }
+
+  window.criarContaFirebase = criarContaFirebase;
 
   const FirebaseAPI = {
     // Tempo real: dispara callback(lista) sempre que a coleção mudar.
