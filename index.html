@@ -3071,7 +3071,7 @@ async function saveUsuario(id){
   try {
 
     // ============================================================
-    // EDITAR USUÁRIO EXISTENTE
+    // EDITAR USUÁRIO
     // ============================================================
 
     if(id){
@@ -3126,9 +3126,15 @@ async function saveUsuario(id){
     }
 
 
-    // Cria a conta no Firebase Authentication
-    // usando uma instância secundária para NÃO
-    // derrubar a sessão do administrador.
+    console.log(
+      '👤 Criando novo usuário:',
+      email
+    );
+
+
+    // ------------------------------------------------------------
+    // 1. CRIA NO FIREBASE AUTHENTICATION
+    // ------------------------------------------------------------
 
     const firebaseUser =
       await criarContaFirebase(
@@ -3137,7 +3143,16 @@ async function saveUsuario(id){
       );
 
 
-    // Salva o perfil usando o UID do Authentication
+    console.log(
+      '🔥 Authentication criado:',
+      firebaseUser.uid
+    );
+
+
+    // ------------------------------------------------------------
+    // 2. CRIA O PERFIL NO FIRESTORE
+    // ------------------------------------------------------------
+
     await FirebaseAPI.set(
       'usuarios',
       firebaseUser.uid,
@@ -3150,6 +3165,16 @@ async function saveUsuario(id){
     );
 
 
+    console.log(
+      '🔥 Perfil salvo no Firestore:',
+      firebaseUser.uid
+    );
+
+
+    // ------------------------------------------------------------
+    // 3. FECHA MODAL
+    // ------------------------------------------------------------
+
     closeModal();
 
     toast(
@@ -3157,10 +3182,11 @@ async function saveUsuario(id){
       'success'
     );
 
+
   } catch(erro){
 
     console.error(
-      'Erro ao salvar usuário:',
+      '❌ Erro ao salvar usuário:',
       erro
     );
 
@@ -3168,18 +3194,28 @@ async function saveUsuario(id){
       'Não foi possível salvar o usuário.';
 
     if(erro?.code === 'auth/email-already-in-use'){
+
       mensagem =
         'Este e-mail já está cadastrado no Firebase Authentication.';
-    }
 
-    else if(erro?.code === 'auth/invalid-email'){
+    } else if(erro?.code === 'auth/invalid-email'){
+
       mensagem =
         'O e-mail informado é inválido.';
-    }
 
-    else if(erro?.code === 'auth/weak-password'){
+    } else if(erro?.code === 'auth/weak-password'){
+
       mensagem =
-        'A senha é muito fraca.';
+        'A senha precisa ter pelo menos 6 caracteres.';
+
+    } else if(
+      erro?.code === 'permission-denied' ||
+      erro?.code === 'firestore/permission-denied'
+    ){
+
+      mensagem =
+        'Sem permissão para salvar o perfil no Firestore.';
+
     }
 
     toast(
