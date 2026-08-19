@@ -865,7 +865,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   // 1) SDK modular do Firebase via CDN (ajuste a versão se preferir)
   import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import {
-    getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
+    getFirestore, collection, doc, getDocs, addDoc, setDoc, updateDoc, deleteDoc,
     onSnapshot, query, orderBy, serverTimestamp
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
   import {
@@ -938,6 +938,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     },
     async update(colName, id, data){
       await updateDoc(doc(db,colName,id), data);
+    },
+    async set(colName, id, data){
+      await setDoc(
+        doc(db, colName, id),
+        data
+      );
     },
     async remove(colName, id){
       await deleteDoc(doc(db,colName,id));
@@ -3049,23 +3055,136 @@ function openUsuarioForm(id){
   `);
 }
 async function saveUsuario(id){
+
   const nome = document.getElementById('us-nome').value.trim();
-  const email = document.getElementById('us-email').value.trim();
+  const email = document.getElementById('us-email').value.trim().toLowerCase();
   const perfil = document.getElementById('us-perfil').value;
   const senha = document.getElementById('us-senha').value;
-  if(!nome || !email){ toast('Preencha nome e e-mail.','error'); return; }
-  if(id){
-    const u = USERS.find(x=>x.id===id);
-    u.nome=nome; u.email=email; u.perfil=perfil;
-    if(senha) u.senha=senha;
-    // TODO(Firebase): await FirebaseAPI.update('usuarios', id, {nome,email,perfil, ...(senha?{senha}:{})});
-  } else {
-    USERS.push({id:'u'+Date.now(), nome, email, senha: senha||'trocar123', perfil});
-    // TODO(Firebase): await FirebaseAPI.create('usuarios', {nome,email,perfil,senha: senha||'trocar123'});
+
+  if(!nome || !email){
+    toast('Preencha nome e e-mail.','error');
+    return;
   }
-  closeModal();
-  toast('Usuário salvo.','success');
-  renderUsuarios();
+
+  try {
+
+    // ============================================================
+    // EDITAR USUÁRIO EXISTENTE
+    // ============================================================
+
+    if(id){
+
+      const u = USERS.find(x => x.id === id);
+
+      if(!u){
+        toast('Usuário não encontrado.','error');
+        return;
+      }
+
+      await FirebaseAPI.update(
+        'usuarios',
+        id,
+        {
+          nome,
+          email,
+          perfil
+        }
+      );
+
+      closeModal();
+
+      toast('Usuário atualizado.','success');
+
+      return;
+    }
+
+
+    // ============================================================
+    // CRIAR NOVO USUÁRIO
+    // ============================================================
+
+    if(!senha){
+
+      toast(
+        'Informe uma senha para o novo usuário.',
+        'error'
+      );
+
+      return;
+    }
+
+    if(senha.length < 6){
+
+      toast(
+        'A senha precisa ter pelo menos 6 caracteres.',
+        'error'
+      );
+
+      return;
+    }
+
+
+    // Cria a conta no Firebase Authentication
+    // usando uma instância secundária para NÃO
+    // derrubar a sessão do administrador.
+
+    const firebaseUser =
+      await criarContaFirebase(
+        email,
+        senha
+      );
+
+
+    // Salva o perfil usando o UID do Authentication
+    await FirebaseAPI.set(
+      'usuarios',
+      firebaseUser.uid,
+      {
+        nome,
+        email,
+        perfil,
+        firebaseUid: firebaseUser.uid
+      }
+    );
+
+
+    closeModal();
+
+    toast(
+      `${nome} foi criado com sucesso.`,
+      'success'
+    );
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao salvar usuário:',
+      erro
+    );
+
+    let mensagem =
+      'Não foi possível salvar o usuário.';
+
+    if(erro?.code === 'auth/email-already-in-use'){
+      mensagem =
+        'Este e-mail já está cadastrado no Firebase Authentication.';
+    }
+
+    else if(erro?.code === 'auth/invalid-email'){
+      mensagem =
+        'O e-mail informado é inválido.';
+    }
+
+    else if(erro?.code === 'auth/weak-password'){
+      mensagem =
+        'A senha é muito fraca.';
+    }
+
+    toast(
+      mensagem,
+      'error'
+    );
+  }
 }
 
 /* ---------------- Resize handling ---------------- */
