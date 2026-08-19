@@ -947,6 +947,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   // Disponibiliza para o script principal (fora do módulo) usar via window.FirebaseAPI
   window.FirebaseAPI = FirebaseAPI;
   window.db = db;
+
+  window.FirebaseAuth = {
+    auth,
+    signInWithEmailAndPassword,
+    signOut,
+    sendPasswordResetEmail,
+    createUserWithEmailAndPassword
+  };
 </script>
 
 <script>
@@ -1365,16 +1373,23 @@ async function handleLogin(e){
 
   try {
 
-    // Login real pelo Firebase Authentication
-    const credencial = await signInWithEmailAndPassword(
-      auth,
-      email,
-      pass
-    );
+    console.log('🔥 Tentando login Firebase...');
+
+    const credencial =
+      await window.FirebaseAuth.signInWithEmailAndPassword(
+        window.FirebaseAuth.auth,
+        email,
+        pass
+      );
 
     const firebaseUser = credencial.user;
 
-    // Busca o perfil correspondente no Firestore
+    console.log(
+      '🔥 Firebase Auth OK:',
+      firebaseUser.uid,
+      firebaseUser.email
+    );
+
     const perfil = await FirebaseAPI.getAll('usuarios');
 
     const user = perfil.find(
@@ -1383,13 +1398,23 @@ async function handleLogin(e){
 
     if(!user){
 
-      await signOut(auth);
+      await window.FirebaseAuth.signOut(
+        window.FirebaseAuth.auth
+      );
 
-      errBox.textContent = 'Perfil do usuário não encontrado.';
+      errBox.textContent =
+        'Perfil do usuário não encontrado.';
+
       errBox.style.display = 'block';
+
+      console.error(
+        'Usuário autenticado, mas perfil não encontrado no Firestore.'
+      );
 
       return false;
     }
+
+    console.log('🔥 Perfil encontrado:', user);
 
     currentUser = user;
 
@@ -1436,9 +1461,14 @@ async function handleLogin(e){
 
   } catch(erro) {
 
-    console.error('Erro no login Firebase:', erro);
+    console.error(
+      'Erro no login Firebase:',
+      erro
+    );
 
-    errBox.textContent = 'E-mail ou senha inválidos.';
+    errBox.textContent =
+      'E-mail ou senha inválidos.';
+
     errBox.style.display = 'block';
 
     hurtMascots();
