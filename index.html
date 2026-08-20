@@ -3014,18 +3014,87 @@ async function confirmarDesistencia(id){
   }
 }
 async function marcarEntradaPaga(id){
-  const p = PROCESSOS.find(x=>x.id===id);
-  registrarMovimentacao(p, 'Aguardando entrada', 'Fechado (entrada paga)');
-  p.comentarios.push({autor: currentUser.nome, texto:'Entrada confirmada. Processo concluído e movido para o Histórico.', data:new Date()});
-  await registrarAtividade('entrada_paga', p);
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!p || !currentUser){
+    return;
+  }
+
+  const stageAnterior = p.stage;
+  const comentariosAnteriores = p.comentarios || [];
+
+  if(!p.comentarios){
+    p.comentarios = [];
+  }
+
+  registrarMovimentacao(
+    p,
+    'Aguardando entrada',
+    'Fechado (entrada paga)'
+  );
+
+  p.comentarios.push({
+    autor: currentUser.nome,
+    autorId: currentUser.id,
+    texto: 'Entrada confirmada. Processo concluído e movido para o Histórico.',
+    data: new Date()
+  });
+
+  await registrarAtividade(
+    'entrada_paga',
+    p
+  );
+
   p.historico = true;
   p.historicoStatus = 'Fechado';
   p.ultimoContato = new Date();
   p.stage = null;
-  // TODO(Firebase): await FirebaseAPI.update('processos', id, {historico:true, historicoStatus:'Fechado', stage:null, ultimoContato: serverTimestamp()});
-  closeModal();
-  toast('Processo marcado como pago e movido para o Histórico.','success');
-  if(currentView==='carteira') renderCarteira(); else navigate('historico');
+
+  try {
+
+    await FirebaseAPI.update(
+      'processos',
+      id,
+      {
+        historico: true,
+        historicoStatus: 'Fechado',
+        stage: null,
+        ultimoContato: p.ultimoContato,
+        comentarios: p.comentarios,
+        movimentacoes: p.movimentacoes || []
+      }
+    );
+
+    closeModal();
+
+    toast(
+      'Processo marcado como pago e movido para o Histórico.',
+      'success'
+    );
+
+    if(currentView === 'carteira'){
+      renderCarteira();
+    }else{
+      navigate('historico');
+    }
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao salvar pagamento da entrada no Firebase:',
+      erro
+    );
+
+    // Reverte as alterações locais se o Firebase falhar
+    p.stage = stageAnterior;
+    p.comentarios = comentariosAnteriores;
+
+    toast(
+      'Não foi possível concluir o processo.',
+      'error'
+    );
+  }
 }
 
 /* =========================================================================
