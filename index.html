@@ -1002,58 +1002,275 @@ let sidebarCollapsed = window.innerWidth <= 900;
 /* =========================================================================
    PRESENÇA — quem está online agora (só quem está logado com o site aberto)
    ========================================================================= */
-let ONLINE_USERS = []; // {id, nome}
-let onlineSimTimer = null;
+let ONLINE_USERS = [];
 
-function goOnline(user){
-  if(!ONLINE_USERS.some(u=>u.id===user.id)){
-    ONLINE_USERS.push({id:user.id, nome:user.nome});
-    // TODO(Firebase): presença real precisa de detecção de desconexão.
-    // Firestore sozinho não avisa quando a aba fecha, então o padrão é:
-    //  a) Firebase Realtime Database com onDisconnect() marcando offline
-    //     automaticamente se a conexão cair (ex.: aba fechada, sem internet); ou
-    //  b) Firestore + heartbeat (grava 'ultimoPing' a cada X segundos) e uma
-    //     Cloud Function/consulta que considera offline quem não pinga há N min.
-    // await FirebaseAPI.update('presence', user.id, {online:true, nome:user.nome, ultimoPing: serverTimestamp()});
+let onlineHeartbeatTimer = null;
+let unsubscribePresence = null;
+
+const PRESENCE_INTERVAL = 10000; // 10 segundos
+const PRESENCE_TIMEOUT = 30000;  // 30 segundos
+
+
+// ============================================================
+// ENTRA ONLINE
+// ============================================================
+
+async function goOnline(user){
+
+  if(!user) return;
+
+  try{
+
+    await FirebaseAPI.update(
+      'presenca',
+      user.id,
+      {
+        id: user.id,
+        nome: user.nome,
+        online: true,
+        ultimoPing: new Date()
+      }
+    );
+
+    console.log(
+      '🟢 Usuário online:',
+      user.nome
+    );
+
+  }catch(erro){
+
+    console.error(
+      '❌ Erro ao entrar online:',
+      erro
+    );
+
   }
-  renderOnlineBadge();
+
 }
-function goOffline(userId){
-  ONLINE_USERS = ONLINE_USERS.filter(u=>u.id!==userId);
-  // TODO(Firebase): await FirebaseAPI.update('presence', userId, {online:false});
-  renderOnlineBadge();
+
+
+// ============================================================
+// HEARTBEAT
+// ============================================================
+
+function iniciarHeartbeat(){
+
+  if(onlineHeartbeatTimer){
+    clearInterval(onlineHeartbeatTimer);
+  }
+
+  if(!currentUser) return;
+
+  // Primeiro ping imediatamente
+  goOnline(currentUser);
+
+  // Depois continua a cada 10 segundos
+  onlineHeartbeatTimer = setInterval(()=>{
+
+    if(!currentUser){
+      return;
+    }
+
+    goOnline(currentUser);
+
+  }, PRESENCE_INTERVAL);
+
 }
+
+
+// ============================================================
+// FICA OFFLINE
+// ============================================================
+
+async function goOffline(userId){
+
+  if(!userId) return;
+
+  try{
+
+    await FirebaseAPI.update(
+      'presenca',
+      userId,
+      {
+        online: false,
+        ultimoPing: new Date()
+      }
+    );
+
+    console.log(
+      '🔴 Usuário offline:',
+      userId
+    );
+
+  }catch(erro){
+
+    console.error(
+      '❌ Erro ao ficar offline:',
+      erro
+    );
+
+  }
+
+}
+
+
+// ============================================================
+// LISTENER DE PRESENÇA
+// ============================================================
+
+function iniciarListenerPresenca(){
+
+  if(unsubscribePresence){
+    unsubscribePresence();
+    unsubscribePresence = null;
+  }
+
+  unsubscribePresence = FirebaseAPI.listen(
+    'presenca',
+    lista => {
+
+      const agora = Date.now();
+
+      ONLINE_USERS = lista
+        .filter(p => {
+
+          if(p.online !== true){
+            return false;
+          }
+
+          if(!p.ultimoPing){
+            return false;
+          }
+
+          let dataPing;
+
+          if(typeof p.ultimoPing.toDate === 'function'){
+            dataPing = p.ultimoPing.toDate();
+          }else{
+            dataPing = new Date(p.ultimoPing);
+          }
+
+          if(isNaN(dataPing.getTime())){
+            return false;
+          }
+
+          const diferenca =
+            agora - dataPing.getTime();
+
+          return diferenca < PRESENCE_TIMEOUT;
+
+        })
+        .map(p => ({
+          id: p.id,
+          nome: p.nome
+        }));
+
+      renderOnlineBadge();
+
+    }
+  );
+
+}
+
+
+// ============================================================
+// RENDERIZA CONTADOR + NOMES
+// ============================================================
+
 function renderOnlineBadge(){
-  const countEl = document.getElementById('online-count');
-  const tipEl = document.getElementById('online-tooltip');
-  if(!countEl) return;
-  countEl.textContent = ONLINE_USERS.length;
-  tipEl.innerHTML = `<div class="ot-title">${ONLINE_USERS.length===1?'1 pessoa online':ONLINE_USERS.length+' pessoas online'}</div>` +
-    ONLINE_USERS.map(u=>`<div class="ot-row"><span class="ot-dot"></span><span class="ot-name">${u.nome}${currentUser&&u.id===currentUser.id?' (você)':''}</span></div>`).join('');
+
+  const countEl =
+    document.getElementById('online-count');
+
+  const tipEl =
+    document.getElementById('online-tooltip');
+
+  if(!countEl || !tipEl) return;
+
+  const quantidade =
+    ONLINE_USERS.length;
+
+  countEl.textContent =
+    quantidade;
+
+  tipEl.innerHTML =
+    `<div class="ot-title">${
+      quantidade === 1
+        ? '1 pessoa online'
+        : `${quantidade} pessoas online`
+    }</div>` +
+
+    ONLINE_USERS
+      .map(u => `
+        <div class="ot-row">
+          <span class="ot-dot"></span>
+          <span class="ot-name">
+            ${u.nome}${
+              currentUser &&
+              u.id === currentUser.id
+                ? ' (você)'
+                : ''
+            }
+          </span>
+        </div>
+      `)
+      .join('');
+
 }
-// Marca offline se a aba/janela for fechada ou recarregada enquanto logado.
-window.addEventListener('beforeunload', ()=>{
-  if(currentUser) goOffline(currentUser.id);
-});
-// --- Simulação para demonstração ---
-// Este protótipo roda isolado no seu navegador, sem back-end, então não há
-// como enxergar outras pessoas de verdade. Para o contador não ficar sempre
-// travado em "1", simulamos 1–2 colegas entrando e saindo de vez em quando.
-// Ao ligar o Firebase, troque isso por FirebaseAPI.listen('presence', ...).
-function startOnlinePresenceSimulation(){
-  if(onlineSimTimer) return;
-  const colegas = USERS.filter(u=>currentUser && u.id!==currentUser.id);
-  onlineSimTimer = setInterval(()=>{
-    if(!currentUser || !colegas.length) return;
-    const alvo = rnd(colegas);
-    const jaOnline = ONLINE_USERS.some(u=>u.id===alvo.id);
-    if(jaOnline) goOffline(alvo.id); else goOnline(alvo);
-  }, 9000);
+
+
+// ============================================================
+// SAIR DO ORION
+// ============================================================
+
+async function pararPresenca(){
+
+  if(onlineHeartbeatTimer){
+
+    clearInterval(
+      onlineHeartbeatTimer
+    );
+
+    onlineHeartbeatTimer = null;
+
+  }
+
+  if(currentUser){
+
+    await goOffline(
+      currentUser.id
+    );
+
+  }
+
 }
-function stopOnlinePresenceSimulation(){
-  clearInterval(onlineSimTimer);
-  onlineSimTimer = null;
-}
+
+
+// ============================================================
+// QUANDO A PÁGINA FOR FECHADA
+// ============================================================
+
+window.addEventListener(
+  'beforeunload',
+  () => {
+
+    if(
+      currentUser &&
+      navigator.sendBeacon
+    ){
+
+      // O heartbeat será o mecanismo principal.
+      // O beforeunload serve apenas como tentativa
+      // adicional de marcar offline.
+
+      goOffline(
+        currentUser.id
+      );
+
+    }
+
+  }
+);
 
 
 /* ---------------- Dados de apoio ---------------- */
@@ -1549,8 +1766,8 @@ async function handleLogin(e){
         ? 'block'
         : 'none';
 
-    goOnline(user);
-    startOnlinePresenceSimulation();
+    iniciarListenerPresenca();
+    iniciarHeartbeat();
 
     applySidebarState();
     updateAgendaBadge();
@@ -1580,22 +1797,52 @@ async function handleLogin(e){
   }
 }
 
-function handleLogout(){
-  // TODO(Firebase Auth): await signOut(auth);
-  if(currentUser) goOffline(currentUser.id);
+async function handleLogout(){
 
+  // Marca o usuário como offline
+  await pararPresenca();
+
+  // Encerra o listener dos processos
   if (unsubscribeProcessos) {
-  unsubscribeProcessos();
-  unsubscribeProcessos = null;
+    unsubscribeProcessos();
+    unsubscribeProcessos = null;
   }
 
-  stopOnlinePresenceSimulation();
+  // Encerra o listener da presença
+  if (unsubscribePresence) {
+    unsubscribePresence();
+    unsubscribePresence = null;
+  }
+
+  // Limpa a lista local de usuários online
   ONLINE_USERS = [];
+  renderOnlineBadge();
+
+  // Encerra a sessão do Firebase Authentication
+  try {
+    await signOut(auth);
+  } catch (erro) {
+    console.error(
+      'Erro ao sair do Firebase Authentication:',
+      erro
+    );
+  }
+
   currentUser = null;
+
   document.title = 'Orion — Entrar';
-  document.getElementById('main-screen').classList.add('hidden');
-  document.getElementById('login-screen').classList.remove('hidden');
-  document.getElementById('login-form-el').reset();
+
+  document
+    .getElementById('main-screen')
+    .classList.add('hidden');
+
+  document
+    .getElementById('login-screen')
+    .classList.remove('hidden');
+
+  document
+    .getElementById('login-form-el')
+    .reset();
 }
 
 /* =========================================================================
