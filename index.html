@@ -1736,7 +1736,10 @@ async function handleLogout(){
 
   // Encerra a sessão do Firebase Authentication
   try {
-    await signOut(auth);
+    await window.FirebaseAuth.signOut(
+      window.FirebaseAuth.auth
+    );
+    console.log('Logout do Firebase realizado com sucesso.');
   } catch (erro) {
     console.error(
       'Erro ao sair do Firebase Authentication:',
