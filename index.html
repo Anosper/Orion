@@ -1338,7 +1338,9 @@ function iniciarListenerUsuarios(){
 
           try{
 
-            await signOut(auth);
+            await window.FirebaseAuth.signOut(
+              window.FirebaseAuth.auth
+            );
 
           }catch(erro){
 
@@ -1728,6 +1730,11 @@ async function handleLogout(){
   if (unsubscribePresence) {
     unsubscribePresence();
     unsubscribePresence = null;
+  }
+
+  if (unsubscribeUsuarios) {
+    unsubscribeUsuarios();
+    unsubscribeUsuarios = null;
   }
 
   // Limpa a lista local de usuários online
