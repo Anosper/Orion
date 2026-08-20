@@ -2431,16 +2431,61 @@ function renderAgendaDoProcesso(p){
     `).join('')}
   </div>`;
 }
-function concluirAgendaInline(agendaId, procId){
-  const a = AGENDA.find(x=>x.id===agendaId);
+async function concluirAgendaInline(agendaId, procId){
+
+  const a = AGENDA.find(x => x.id === agendaId);
+
   if(!a) return;
+
+  const statusAnterior = a.status;
+
+  // Atualização local imediata
   a.status = 'concluido';
-  // TODO(Firebase): await FirebaseAPI.update('agenda', agendaId, {status:'concluido'});
-  const p = PROCESSOS.find(x=>x.id===procId);
-  const inline = document.getElementById(`agenda-inline-${procId}`);
-  if(inline) inline.innerHTML = renderAgendaDoProcesso(p);
-  updateAgendaBadge();
-  toast('Compromisso concluído.','success');
+
+  try {
+
+    // Salva no Firebase
+    await FirebaseAPI.update(
+      'agenda',
+      agendaId,
+      {
+        status: 'concluido'
+      }
+    );
+
+    const p = PROCESSOS.find(x => x.id === procId);
+
+    const inline =
+      document.getElementById(`agenda-inline-${procId}`);
+
+    if(inline && p){
+      inline.innerHTML = renderAgendaDoProcesso(p);
+    }
+
+    updateAgendaBadge();
+
+    toast(
+      'Compromisso concluído.',
+      'success'
+    );
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao concluir compromisso no Firebase:',
+      erro
+    );
+
+    // Reverte caso o Firebase falhe
+    a.status = statusAnterior;
+
+    updateAgendaBadge();
+
+    toast(
+      'Não foi possível concluir o compromisso.',
+      'error'
+    );
+  }
 }
 function normalizarData(valor){
 
