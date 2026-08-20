@@ -1488,6 +1488,11 @@ function iniciarListenerProcessos() {
       PROCESSOS = lista.map(p => ({
         ...p,
 
+        comentarios: (p.comentarios || []).map(c => ({
+          ...c,
+          data: normalizarData(c.data)
+        })),
+
         // Compatibilidade com o formato usado pelo Orion
         valorCausa: typeof p.valor_causa === 'number'
           ? p.valor_causa
@@ -1566,7 +1571,11 @@ function iniciarListenerAgenda(){
         lista
       );
 
-      AGENDA = lista;
+      AGENDA = lista.map(item => ({
+        ...item,
+        data: normalizarData(item.data),
+        criadoEm: normalizarData(item.criadoEm)
+      }));
 
       updateAgendaBadge();
 
@@ -2432,6 +2441,25 @@ function concluirAgendaInline(agendaId, procId){
   if(inline) inline.innerHTML = renderAgendaDoProcesso(p);
   updateAgendaBadge();
   toast('Compromisso concluído.','success');
+}
+function normalizarData(valor){
+
+  if(!valor) return null;
+
+  // Já é Date
+  if(valor instanceof Date){
+    return valor;
+  }
+
+  // Timestamp do Firebase
+  if(typeof valor.toDate === 'function'){
+    return valor.toDate();
+  }
+
+  // String / número
+  const data = new Date(valor);
+
+  return isNaN(data.getTime()) ? null : data;
 }
 function toDateInputValue(d){
   const dt = (d instanceof Date) ? d : new Date(d);
