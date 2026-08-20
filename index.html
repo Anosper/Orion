@@ -1288,7 +1288,35 @@ function fmtDate(d){
 
   return '—';
 }
-function fmtDateTime(d){return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`;}
+function fmtDateTime(d){
+
+  if(!d){
+    return '—';
+  }
+
+  // Firebase Timestamp
+  if(typeof d.toDate === 'function'){
+    d = d.toDate();
+  }
+
+  // Se vier como string
+  if(!(d instanceof Date)){
+    d = new Date(d);
+  }
+
+  // Data inválida
+  if(isNaN(d.getTime())){
+    return '—';
+  }
+
+  return `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString(
+    'pt-BR',
+    {
+      hour: '2-digit',
+      minute: '2-digit'
+    }
+  )}`;
+}
 function registrarMovimentacao(p, de, para){
   if(!p.movimentacoes) p.movimentacoes = [];
   p.movimentacoes.push({data:new Date(), autor: currentUser.nome, de, para});
