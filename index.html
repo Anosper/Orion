@@ -1022,6 +1022,8 @@ let unsubscribePresence = null;
 
 function goOnline(user){
 
+  console.log('🟡 goOnline foi chamado:', user);
+
   if(!user) return;
 
   const userRef = window.firebaseRTDB.ref(
@@ -1037,6 +1039,11 @@ function goOnline(user){
   window.firebaseRTDB.onValue(
     connectedRef,
     async snapshot => {
+
+      console.log(
+        '🔵 Estado da conexão RTDB:',
+        snapshot.val()
+      );
 
       if(snapshot.val() !== true){
         return;
