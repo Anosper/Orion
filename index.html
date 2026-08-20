@@ -2805,15 +2805,50 @@ async function verificarTelefones(id){
   toast('Números vinculados encontrados.','success');
 }
 async function assumirProcesso(id){
-  const p = PROCESSOS.find(x=>x.id===id);
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!p || !currentUser){
+    return;
+  }
+
+  const novoStage = 'contato';
+  const agora = new Date();
+
   p.responsavelId = currentUser.id;
-  p.stage = 'contato';
-  p.ultimoContato = new Date();
+  p.responsavelNome = currentUser.nome;
+  p.stage = novoStage;
+  p.ultimoContato = agora;
+
   registrarMovimentacao(p, '—', 'Em contato');
-  // TODO(Firebase): await FirebaseAPI.update('processos', id, {responsavelId:p.responsavelId, stage:p.stage, ultimoContato: serverTimestamp()});
-  closeModal();
-  toast('Processo movido para sua carteira.','success');
-  renderProcessos();
+
+  try {
+
+    await FirebaseAPI.update('processos', id, {
+      responsavelId: currentUser.id,
+      responsavelNome: currentUser.nome,
+      stage: novoStage,
+      ultimoContato: agora
+    });
+
+    closeModal();
+
+    toast('Processo movido para sua carteira.', 'success');
+
+    renderProcessos();
+
+  } catch(erro) {
+
+    console.error(
+      'Erro ao assumir processo no Firebase:',
+      erro
+    );
+
+    toast(
+      'Não foi possível assumir o processo.',
+      'error'
+    );
+  }
 }
 
 /* =========================================================================
