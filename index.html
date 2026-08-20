@@ -1024,17 +1024,17 @@ function goOnline(user){
 
   if(!user) return;
 
-  const userRef = ref(
-    rtdb,
+  const userRef = window.firebaseRTDB.ref(
+    window.rtdb,
     `presenca/${user.id}`
   );
 
-  const connectedRef = ref(
-    rtdb,
+  const connectedRef = window.firebaseRTDB.ref(
+    window.rtdb,
     '.info/connected'
   );
 
-  onValue(
+  window.firebaseRTDB.onValue(
     connectedRef,
     async snapshot => {
 
@@ -1046,14 +1046,14 @@ function goOnline(user){
 
         // Se a conexão cair ou a aba fechar,
         // o Firebase marca automaticamente como offline.
-        await onDisconnect(userRef).set({
+        await window.firebaseRTDB.onDisconnect(userRef).set({
           id: user.id,
           nome: user.nome,
           online: false
         });
 
         // Marca o usuário como online agora.
-        await set(userRef, {
+        await window.firebaseRTDB.set(userRef, {
           id: user.id,
           nome: user.nome,
           online: true
@@ -1086,12 +1086,12 @@ function goOffline(userId){
 
   if(!userId) return;
 
-  const userRef = ref(
-    rtdb,
+  const userRef = window.firebaseRTDB.ref(
+    window.rtdb,
     `presenca/${userId}`
   );
 
-  return set(userRef, {
+  return window.firebaseRTDB.set(userRef, {
     online: false
   });
 }
@@ -1109,8 +1109,8 @@ function iniciarListenerPresenca(){
     'presenca'
   );
 
-  unsubscribePresence = onValue(
-    presencaRef,
+  unsubscribePresence = window.firebaseRTDB.onValue(
+    presenceRef,
     snapshot => {
 
       const dados = snapshot.val() || {};
