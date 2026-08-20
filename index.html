@@ -1025,8 +1025,6 @@ let unsubscribePresence = null;
 
 function goOnline(user){
 
-  console.log('🟡 goOnline foi chamado:', user);
-
   if(!user) return;
 
   const userRef = window.firebaseRTDB.ref(
@@ -1054,15 +1052,12 @@ function goOnline(user){
 
       try{
 
-        // Se a conexão cair ou a aba fechar,
-        // o Firebase marca automaticamente como offline.
         await window.firebaseRTDB.onDisconnect(userRef).set({
           id: user.id,
           nome: user.nome,
           online: false
         });
 
-        // Marca o usuário como online agora.
         await window.firebaseRTDB.set(userRef, {
           id: user.id,
           nome: user.nome,
@@ -1083,9 +1078,6 @@ function goOnline(user){
 
       }
 
-    },
-    {
-      onlyOnce: true
     }
   );
 
