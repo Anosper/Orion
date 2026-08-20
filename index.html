@@ -942,10 +942,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
       await updateDoc(doc(db,colName,id), data);
     },
     async set(colName, id, data){
-      await setDoc(
-        doc(db, colName, id),
-        data
-      );
+      await setDoc(doc(db,colName,id), data);
     },
     async remove(colName, id){
       await deleteDoc(doc(db,colName,id));
@@ -1021,7 +1018,7 @@ async function goOnline(user){
 
   try{
 
-    await FirebaseAPI.update(
+    await FirebaseAPI.set(
       'presenca',
       user.id,
       {
