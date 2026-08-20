@@ -875,6 +875,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     sendPasswordResetEmail,
     createUserWithEmailAndPassword
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import {
+    getDatabase,
+    ref,
+    set,
+    onValue,
+    onDisconnect,
+    serverTimestamp as rtdbServerTimestamp
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
   // 2) COLE AQUI a config do seu projeto (Console Firebase > Configurações do projeto > Seus apps)
   const firebaseConfig = {
@@ -889,6 +897,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
   const auth = getAuth(app);
+  const rtdb = getDatabase(app);
 
   async function criarContaFirebase(email, senha){
 
@@ -1001,119 +1010,84 @@ let sidebarCollapsed = window.innerWidth <= 900;
    ========================================================================= */
 let ONLINE_USERS = [];
 
-let onlineHeartbeatTimer = null;
 let unsubscribePresence = null;
 
-const PRESENCE_INTERVAL = 10000; // 10 segundos
-const PRESENCE_TIMEOUT = 30000;  // 30 segundos
-
-
-// ============================================================
-// ENTRA ONLINE
-// ============================================================
-
-async function goOnline(user){
+function goOnline(user){
 
   if(!user) return;
 
-  try{
+  const userRef = ref(
+    rtdb,
+    `presenca/${user.id}`
+  );
 
-    await FirebaseAPI.set(
-      'presenca',
-      user.id,
-      {
-        id: user.id,
-        nome: user.nome,
-        online: true,
-        ultimoPing: new Date()
+  const connectedRef = ref(
+    rtdb,
+    '.info/connected'
+  );
+
+  onValue(
+    connectedRef,
+    async snapshot => {
+
+      if(snapshot.val() !== true){
+        return;
       }
-    );
 
-    console.log(
-      '🟢 Usuário online:',
-      user.nome
-    );
+      try{
 
-  }catch(erro){
+        // Se a conexão cair ou a aba fechar,
+        // o Firebase marca automaticamente como offline.
+        await onDisconnect(userRef).set({
+          id: user.id,
+          nome: user.nome,
+          online: false
+        });
 
-    console.error(
-      '❌ Erro ao entrar online:',
-      erro
-    );
+        // Marca o usuário como online agora.
+        await set(userRef, {
+          id: user.id,
+          nome: user.nome,
+          online: true
+        });
 
-  }
+        console.log(
+          '🟢 Usuário online:',
+          user.nome
+        );
 
-}
+      }catch(erro){
 
+        console.error(
+          '❌ Erro ao configurar presença:',
+          erro
+        );
 
-// ============================================================
-// HEARTBEAT
-// ============================================================
+      }
 
-function iniciarHeartbeat(){
-
-  if(onlineHeartbeatTimer){
-    clearInterval(onlineHeartbeatTimer);
-  }
-
-  if(!currentUser) return;
-
-  // Primeiro ping imediatamente
-  goOnline(currentUser);
-
-  // Depois continua a cada 10 segundos
-  onlineHeartbeatTimer = setInterval(()=>{
-
-    if(!currentUser){
-      return;
+    },
+    {
+      onlyOnce: true
     }
-
-    goOnline(currentUser);
-
-  }, PRESENCE_INTERVAL);
+  );
 
 }
 
 
-// ============================================================
-// FICA OFFLINE
-// ============================================================
-
-async function goOffline(userId){
+function goOffline(userId){
 
   if(!userId) return;
 
-  try{
+  const userRef = ref(
+    rtdb,
+    `presenca/${userId}`
+  );
 
-    await FirebaseAPI.update(
-      'presenca',
-      userId,
-      {
-        online: false,
-        ultimoPing: new Date()
-      }
-    );
-
-    console.log(
-      '🔴 Usuário offline:',
-      userId
-    );
-
-  }catch(erro){
-
-    console.error(
-      '❌ Erro ao ficar offline:',
-      erro
-    );
-
-  }
-
+  return set(userRef, {
+    online: false
+  });
 }
 
-
-// ============================================================
-// LISTENER DE PRESENÇA
-// ============================================================
 
 function iniciarListenerPresenca(){
 
@@ -1122,45 +1096,28 @@ function iniciarListenerPresenca(){
     unsubscribePresence = null;
   }
 
-  unsubscribePresence = FirebaseAPI.listen(
-    'presenca',
-    lista => {
+  const presencaRef = ref(
+    rtdb,
+    'presenca'
+  );
 
-      const agora = Date.now();
+  unsubscribePresence = onValue(
+    presencaRef,
+    snapshot => {
 
-      ONLINE_USERS = lista
-        .filter(p => {
+      const dados = snapshot.val() || {};
 
-          if(p.online !== true){
-            return false;
-          }
-
-          if(!p.ultimoPing){
-            return false;
-          }
-
-          let dataPing;
-
-          if(typeof p.ultimoPing.toDate === 'function'){
-            dataPing = p.ultimoPing.toDate();
-          }else{
-            dataPing = new Date(p.ultimoPing);
-          }
-
-          if(isNaN(dataPing.getTime())){
-            return false;
-          }
-
-          const diferenca =
-            agora - dataPing.getTime();
-
-          return diferenca < PRESENCE_TIMEOUT;
-
-        })
-        .map(p => ({
-          id: p.id,
-          nome: p.nome
+      ONLINE_USERS = Object.values(dados)
+        .filter(u => u.online === true)
+        .map(u => ({
+          id: u.id,
+          nome: u.nome
         }));
+
+      console.log(
+        '🟢 Usuários online:',
+        ONLINE_USERS
+      );
 
       renderOnlineBadge();
 
@@ -1169,10 +1126,6 @@ function iniciarListenerPresenca(){
 
 }
 
-
-// ============================================================
-// RENDERIZA CONTADOR + NOMES
-// ============================================================
 
 function renderOnlineBadge(){
 
@@ -1212,62 +1165,18 @@ function renderOnlineBadge(){
         </div>
       `)
       .join('');
-
 }
 
-
-// ============================================================
-// SAIR DO ORION
-// ============================================================
 
 async function pararPresenca(){
 
-  if(onlineHeartbeatTimer){
+  if(!currentUser) return;
 
-    clearInterval(
-      onlineHeartbeatTimer
-    );
-
-    onlineHeartbeatTimer = null;
-
-  }
-
-  if(currentUser){
-
-    await goOffline(
-      currentUser.id
-    );
-
-  }
+  await goOffline(
+    currentUser.id
+  );
 
 }
-
-
-// ============================================================
-// QUANDO A PÁGINA FOR FECHADA
-// ============================================================
-
-window.addEventListener(
-  'beforeunload',
-  () => {
-
-    if(
-      currentUser &&
-      navigator.sendBeacon
-    ){
-
-      // O heartbeat será o mecanismo principal.
-      // O beforeunload serve apenas como tentativa
-      // adicional de marcar offline.
-
-      goOffline(
-        currentUser.id
-      );
-
-    }
-
-  }
-);
 
 
 /* ---------------- Dados de apoio ---------------- */
@@ -1764,7 +1673,7 @@ async function handleLogin(e){
         : 'none';
 
     iniciarListenerPresenca();
-    iniciarHeartbeat();
+    goOnline(user);
 
     applySidebarState();
     updateAgendaBadge();
