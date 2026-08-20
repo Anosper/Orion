@@ -2444,6 +2444,9 @@ async function concluirAgendaInline(agendaId, procId){
 
   try {
 
+    console.log('📅 Concluindo agenda:', agendaId);
+    console.log('📅 Item antes do update:', a);
+
     // Salva no Firebase
     await FirebaseAPI.update(
       'agenda',
@@ -2451,6 +2454,11 @@ async function concluirAgendaInline(agendaId, procId){
       {
         status: 'concluido'
       }
+    );
+
+    console.log(
+      '✅ Status concluído salvo no Firebase:',
+      agendaId
     );
 
     const p = PROCESSOS.find(x => x.id === procId);
