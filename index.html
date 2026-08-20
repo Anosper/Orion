@@ -945,10 +945,57 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     // Tempo real: dispara callback(lista) sempre que a coleção mudar.
     // Retorna a função de "unsubscribe" — guarde-a se quiser parar de ouvir depois.
     listen(colName, callback, orderField=null){
-      const ref = orderField ? query(collection(db,colName), orderBy(orderField,'desc')) : collection(db,colName);
-      return onSnapshot(ref, snap=>{
-        callback(snap.docs.map(d=>({id:d.id, ...d.data()})));
-      }, err=>console.error(`[FirebaseAPI] erro ao ouvir "${colName}":`, err));
+
+      // Se não houver usuário autenticado,
+      // não inicia o listener.
+      if (!auth.currentUser) {
+        console.warn(
+          `[FirebaseAPI] não iniciou listener "${colName}" porque não há usuário autenticado.`
+        );
+
+        return () => {};
+      }
+
+      const ref = orderField
+        ? query(
+            collection(db, colName),
+            orderBy(orderField, 'desc')
+          )
+        : collection(db, colName);
+
+      return onSnapshot(
+        ref,
+        snap => {
+
+          // Ignora qualquer retorno caso o usuário
+          // tenha saído durante a operação.
+          if (!auth.currentUser) {
+            return;
+          }
+
+          callback(
+            snap.docs.map(d => ({
+              id: d.id,
+              ...d.data()
+            }))
+          );
+
+        },
+        err => {
+
+          // Se o usuário acabou de sair,
+          // não trata isso como erro da aplicação.
+          if (!auth.currentUser) {
+            return;
+          }
+
+          console.error(
+            `[FirebaseAPI] erro ao ouvir "${colName}":`,
+            err
+          );
+
+        }
+      );
     },
     async getAll(colName){
       const snap = await getDocs(collection(db, colName));
