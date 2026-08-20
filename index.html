@@ -3558,14 +3558,63 @@ function limparDiaAgenda(){
   agendaDiaSelecionado = null;
   renderAgenda();
 }
-function toggleAgendaStatus(id){
-  const a = AGENDA.find(x=>x.id===id);
+async function toggleAgendaStatus(id){
+
+  const a = AGENDA.find(x => x.id === id);
+
   if(!a) return;
-  a.status = a.status==='aberto' ? 'concluido' : 'aberto';
-  // TODO(Firebase): await FirebaseAPI.update('agenda', id, {status:a.status});
-  updateAgendaBadge();
-  renderAgenda();
-  toast(a.status==='concluido' ? 'Compromisso concluído.' : 'Compromisso reaberto.', 'success');
+
+  const statusAnterior = a.status;
+  const novoStatus =
+    a.status === 'aberto' ? 'concluido' : 'aberto';
+
+  // Atualização local imediata
+  a.status = novoStatus;
+
+  try {
+
+    await FirebaseAPI.update(
+      'agenda',
+      id,
+      {
+        status: novoStatus
+      }
+    );
+
+    console.log(
+      '✅ Status da agenda salvo no Firebase:',
+      id,
+      novoStatus
+    );
+
+    updateAgendaBadge();
+    renderAgenda();
+
+    toast(
+      novoStatus === 'concluido'
+        ? 'Compromisso concluído.'
+        : 'Compromisso reaberto.',
+      'success'
+    );
+
+  } catch(erro){
+
+    console.error(
+      '❌ Erro ao atualizar status da agenda no Firebase:',
+      erro
+    );
+
+    // Reverte a alteração local
+    a.status = statusAnterior;
+
+    updateAgendaBadge();
+    renderAgenda();
+
+    toast(
+      'Não foi possível atualizar o compromisso.',
+      'error'
+    );
+  }
 }
 function renderAgenda(){
   const c = document.getElementById('content');
