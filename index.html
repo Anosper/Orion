@@ -899,6 +899,14 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   const auth = getAuth(app);
   const rtdb = getDatabase(app);
 
+  window.rtdb = rtdb;
+  window.firebaseRTDB = {
+    ref,
+    set,
+    onValue,
+    onDisconnect
+  };
+
   async function criarContaFirebase(email, senha){
 
     const appSecundario = initializeApp(
