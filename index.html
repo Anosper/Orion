@@ -1547,6 +1547,36 @@ function toggleOcultarProcesso(id){
    {id, processoId, responsavelId, cliente, data (Date com hora), motivo, status:'aberto'|'concluido', criadoEm}
    --------------------------------------------------------------------------- */
 let AGENDA = [];
+
+let unsubscribeAgenda = null;
+
+function iniciarListenerAgenda(){
+
+  if(unsubscribeAgenda){
+    unsubscribeAgenda();
+    unsubscribeAgenda = null;
+  }
+
+  unsubscribeAgenda = FirebaseAPI.listen(
+    'agenda',
+    lista => {
+
+      console.log(
+        '📅 Agenda recebida do Firebase:',
+        lista
+      );
+
+      AGENDA = lista;
+
+      updateAgendaBadge();
+
+      if(currentView === 'agenda'){
+        renderAgenda();
+      }
+
+    }
+  );
+}
 // TODO(Firebase): substituir por FirebaseAPI.listen('agenda', lista=>{ AGENDA=lista; updateAgendaBadge(); if(currentView==='agenda') renderAgenda(); });
 
 /* ---------------- Log de atividades (tela Histórico) ----------------
@@ -1767,6 +1797,7 @@ async function handleLogin(e){
 
     iniciarListenerUsuarios();
     iniciarListenerProcessos();
+    iniciarListenerAgenda();
 
     navigate('processos');
 
@@ -1810,6 +1841,11 @@ async function handleLogout(){
   if (unsubscribeUsuarios) {
     unsubscribeUsuarios();
     unsubscribeUsuarios = null;
+  }
+
+  if(unsubscribeAgenda){
+    unsubscribeAgenda();
+    unsubscribeAgenda = null;
   }
 
   // Limpa a lista local de usuários online
@@ -2255,26 +2291,91 @@ function renderEtapaContatoBody(p){
     <div id="agenda-inline-${p.id}">${renderAgendaDoProcesso(p)}</div>
   `;
 }
-function agendarContato(procId){
-  const p = PROCESSOS.find(x=>x.id===procId);
+async function agendarContato(procId){
+
+  const p = PROCESSOS.find(x => x.id === procId);
+
+  if(!p || !currentUser){
+    return;
+  }
+
   const dataEl = document.getElementById(`agenda-data-${procId}`);
   const horaEl = document.getElementById(`agenda-hora-${procId}`);
   const motivoEl = document.getElementById(`agenda-motivo-${procId}`);
-  if(!dataEl.value || !horaEl.value){ toast('Preencha data e hora do retorno.','error'); return; }
-  const motivo = motivoEl.value.trim() || 'Retornar contato';
-  const dataHora = new Date(`${dataEl.value}T${horaEl.value}:00`);
+
+  if(!dataEl.value || !horaEl.value){
+    toast('Preencha data e hora do retorno.','error');
+    return;
+  }
+
+  const motivo =
+    motivoEl.value.trim() || 'Retornar contato';
+
+  const dataHora =
+    new Date(`${dataEl.value}T${horaEl.value}:00`);
+
   const item = {
-    id:'ag'+Date.now(), processoId:p.id, responsavelId:currentUser.id, cliente:p.reu,
-    data:dataHora, motivo, status:'aberto', criadoEm:new Date()
+    processoId: p.id,
+    responsavelId: currentUser.id,
+    responsavelNome: currentUser.nome,
+    cliente: p.reu,
+    data: dataHora,
+    motivo,
+    status: 'aberto',
+    criadoEm: new Date()
   };
-  AGENDA.push(item);
-  // TODO(Firebase): await FirebaseAPI.create('agenda', item);
-  p.comentarios.push({autor: currentUser.nome, texto:`Agendou retorno para ${fmtDateTime(dataHora)}: ${motivo}`, data:new Date()});
-  motivoEl.value = '';
-  const inline = document.getElementById(`agenda-inline-${procId}`);
-  if(inline) inline.innerHTML = renderAgendaDoProcesso(p);
-  updateAgendaBadge();
-  toast('Retorno agendado. Ele vai aparecer na sua Agenda.','success');
+
+  try {
+
+    // Salva no Firebase
+    const agendaId =
+      await FirebaseAPI.create('agenda', item);
+
+    // Mantém o mesmo item local com o ID real do Firebase
+    item.id = agendaId;
+
+    AGENDA.push(item);
+
+    // Comentário local
+    if(!p.comentarios){
+      p.comentarios = [];
+    }
+
+    p.comentarios.push({
+      autor: currentUser.nome,
+      texto:
+        `Agendou retorno para ${fmtDateTime(dataHora)}: ${motivo}`,
+      data: new Date()
+    });
+
+    motivoEl.value = '';
+
+    const inline =
+      document.getElementById(`agenda-inline-${procId}`);
+
+    if(inline){
+      inline.innerHTML = renderAgendaDoProcesso(p);
+    }
+
+    updateAgendaBadge();
+
+    toast(
+      'Retorno agendado. Ele vai aparecer na sua Agenda.',
+      'success'
+    );
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao salvar agendamento no Firebase:',
+      erro
+    );
+
+    toast(
+      'Não foi possível salvar o agendamento.',
+      'error'
+    );
+  }
 }
 function renderAgendaDoProcesso(p){
   const itens = AGENDA.filter(a=>a.processoId===p.id && a.responsavelId===currentUser.id && a.status==='aberto')
