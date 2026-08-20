@@ -1493,6 +1493,13 @@ function iniciarListenerProcessos() {
           data: normalizarData(c.data)
         })),
 
+        propostaDataInicio: normalizarData(
+          p.propostaDataInicio
+        ),
+        vendaDataInicio: normalizarData(
+          p.vendaDataInicio
+        ),
+
         // Compatibilidade com o formato usado pelo Orion
         valorCausa: typeof p.valor_causa === 'number'
           ? p.valor_causa
@@ -2646,30 +2653,162 @@ function renderEtapaResumoProposta(p, suffix){
   ${parcelas.length? `<div style="margin-top:8px;">${renderParcelasPreview(parcelas)}</div>` : ''}`;
 }
 async function salvarProposta(id, suffix){
-  const p = PROCESSOS.find(x=>x.id===id);
-  const valorEl = document.getElementById(`proposta-valor-${id}-${suffix}`);
-  const entradaEl = document.getElementById(`proposta-entrada-${id}-${suffix}`);
-  const parcelasEl = document.getElementById(`proposta-parcelas-${id}-${suffix}`);
-  const dataEl = document.getElementById(`proposta-datainicio-${id}-${suffix}`);
-  const planoEl = document.getElementById(`proposta-plano-${id}-${suffix}`);
-  const valor = valorEl.value ? Number(valorEl.value) : null;
-  const entrada = entradaEl.value ? Number(entradaEl.value) : null;
-  const numParcelas = parcelasEl.value ? Number(parcelasEl.value) : null;
-  const dataInicio = dataEl.value ? new Date(`${dataEl.value}T00:00:00`) : null;
-  const plano = planoEl.value.trim();
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!p){
+    return;
+  }
+
+  const valorEl =
+    document.getElementById(`proposta-valor-${id}-${suffix}`);
+
+  const entradaEl =
+    document.getElementById(`proposta-entrada-${id}-${suffix}`);
+
+  const parcelasEl =
+    document.getElementById(`proposta-parcelas-${id}-${suffix}`);
+
+  const dataEl =
+    document.getElementById(`proposta-datainicio-${id}-${suffix}`);
+
+  const planoEl =
+    document.getElementById(`proposta-plano-${id}-${suffix}`);
+
+  const valor =
+    valorEl.value ? Number(valorEl.value) : null;
+
+  const entrada =
+    entradaEl.value ? Number(entradaEl.value) : null;
+
+  const numParcelas =
+    parcelasEl.value ? Number(parcelasEl.value) : null;
+
+  const dataInicio =
+    dataEl.value
+      ? new Date(`${dataEl.value}T00:00:00`)
+      : null;
+
+  const plano =
+    planoEl.value.trim();
+
   if(suffix === 'proposta'){
-    p.propostaValor = valor; p.propostaEntrada = entrada; p.propostaNumParcelas = numParcelas;
-    p.propostaDataInicio = dataInicio; p.propostaPlano = plano;
-    // TODO(Firebase): await FirebaseAPI.update('processos', id, {propostaValor:valor, propostaEntrada:entrada, propostaNumParcelas:numParcelas, propostaDataInicio:dataInicio, propostaPlano:plano});
-    toast('Proposta salva.','success');
+
+    const anterior = {
+      propostaValor: p.propostaValor,
+      propostaEntrada: p.propostaEntrada,
+      propostaNumParcelas: p.propostaNumParcelas,
+      propostaDataInicio: p.propostaDataInicio,
+      propostaPlano: p.propostaPlano
+    };
+
+    // Atualização local imediata
+    p.propostaValor = valor;
+    p.propostaEntrada = entrada;
+    p.propostaNumParcelas = numParcelas;
+    p.propostaDataInicio = dataInicio;
+    p.propostaPlano = plano;
+
+    try {
+
+      await FirebaseAPI.update(
+        'processos',
+        id,
+        {
+          propostaValor: valor,
+          propostaEntrada: entrada,
+          propostaNumParcelas: numParcelas,
+          propostaDataInicio: dataInicio,
+          propostaPlano: plano
+        }
+      );
+
+      toast(
+        'Proposta salva.',
+        'success'
+      );
+
+    } catch(erro){
+
+      console.error(
+        'Erro ao salvar proposta no Firebase:',
+        erro
+      );
+
+      // Reverte se o Firebase falhar
+      p.propostaValor = anterior.propostaValor;
+      p.propostaEntrada = anterior.propostaEntrada;
+      p.propostaNumParcelas = anterior.propostaNumParcelas;
+      p.propostaDataInicio = anterior.propostaDataInicio;
+      p.propostaPlano = anterior.propostaPlano;
+
+      toast(
+        'Não foi possível salvar a proposta.',
+        'error'
+      );
+    }
+
   } else {
-    p.vendaValor = valor; p.vendaEntrada = entrada; p.vendaNumParcelas = numParcelas;
-    p.vendaDataInicio = dataInicio; p.vendaPlano = plano;
-    // TODO(Firebase): await FirebaseAPI.update('processos', id, {vendaValor:valor, vendaEntrada:entrada, vendaNumParcelas:numParcelas, vendaDataInicio:dataInicio, vendaPlano:plano});
-    toast('Venda fechada salva. Os dados de "Em proposta" continuam intactos.','success');
-    // reflete o form imediatamente para tirar o aviso de "sugestão automática"
-    const container = document.getElementById(`acc-body-${id}-fechada`);
-    if(container) container.innerHTML = renderEtapaPropostaBody(p, 'fechada');
+
+    const anterior = {
+      vendaValor: p.vendaValor,
+      vendaEntrada: p.vendaEntrada,
+      vendaNumParcelas: p.vendaNumParcelas,
+      vendaDataInicio: p.vendaDataInicio,
+      vendaPlano: p.vendaPlano
+    };
+
+    p.vendaValor = valor;
+    p.vendaEntrada = entrada;
+    p.vendaNumParcelas = numParcelas;
+    p.vendaDataInicio = dataInicio;
+    p.vendaPlano = plano;
+
+    try {
+
+      await FirebaseAPI.update(
+        'processos',
+        id,
+        {
+          vendaValor: valor,
+          vendaEntrada: entrada,
+          vendaNumParcelas: numParcelas,
+          vendaDataInicio: dataInicio,
+          vendaPlano: plano
+        }
+      );
+
+      toast(
+        'Venda fechada salva. Os dados de "Em proposta" continuam intactos.',
+        'success'
+      );
+
+      const container =
+        document.getElementById(`acc-body-${id}-fechada`);
+
+      if(container){
+        container.innerHTML =
+          renderEtapaPropostaBody(p, 'fechada');
+      }
+
+    } catch(erro){
+
+      console.error(
+        'Erro ao salvar venda no Firebase:',
+        erro
+      );
+
+      p.vendaValor = anterior.vendaValor;
+      p.vendaEntrada = anterior.vendaEntrada;
+      p.vendaNumParcelas = anterior.vendaNumParcelas;
+      p.vendaDataInicio = anterior.vendaDataInicio;
+      p.vendaPlano = anterior.vendaPlano;
+
+      toast(
+        'Não foi possível salvar a venda.',
+        'error'
+      );
+    }
   }
 }
 function toggleDesistenciaBox(id){
