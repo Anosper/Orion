@@ -3133,16 +3133,71 @@ function dragCard(e,id){
   e.target.classList.add('dragging');
 }
 async function moverCardStage(id, stage){
+
   if(!stage) return;
-  const p = PROCESSOS.find(x=>x.id===id);
-  if(p && p.stage !== stage){
-    const stageAntes = STAGE_LABELS[p.stage] || '—';
-    p.stage = stage;
-    p.ultimoContato = new Date();
-    registrarMovimentacao(p, stageAntes, STAGE_LABELS[stage]);
-    // TODO(Firebase): await FirebaseAPI.update('processos', p.id, {stage, ultimoContato: serverTimestamp()});
-    toast(`"${p.reu}" movido para ${STAGE_LABELS[stage]}.`,'success');
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!p) return;
+
+  const stageAnterior = p.stage;
+
+  if(stageAnterior === stage){
+    renderCarteira();
+    return;
   }
+
+  const stageAntesLabel =
+    STAGE_LABELS[stageAnterior] || '—';
+
+  const stageNovoLabel =
+    STAGE_LABELS[stage] || stage;
+
+  const dataMovimentacao = new Date();
+
+  // Atualização local imediata
+  p.stage = stage;
+  p.ultimoContato = dataMovimentacao;
+
+  // Registra movimentação
+  registrarMovimentacao(
+    p,
+    stageAntesLabel,
+    stageNovoLabel
+  );
+
+  try {
+
+    await FirebaseAPI.update(
+      'processos',
+      p.id,
+      {
+        stage: stage,
+        ultimoContato: dataMovimentacao
+      }
+    );
+
+    toast(
+      `"${p.reu}" movido para ${stageNovoLabel}.`,
+      'success'
+    );
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao salvar mudança de etapa no Firebase:',
+      erro
+    );
+
+    // Desfaz apenas a alteração local
+    p.stage = stageAnterior;
+
+    toast(
+      'Não foi possível salvar a mudança de etapa.',
+      'error'
+    );
+  }
+
   renderCarteira();
 }
 async function dropCard(e, stage){
