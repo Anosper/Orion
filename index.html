@@ -1104,8 +1104,8 @@ function iniciarListenerPresenca(){
     unsubscribePresence = null;
   }
 
-  const presencaRef = ref(
-    rtdb,
+  const presenceRef = window.firebaseRTDB.ref(
+    window.rtdb,
     'presenca'
   );
 
