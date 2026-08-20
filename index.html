@@ -2437,22 +2437,125 @@ function toggleDesistenciaBox(id){
   document.getElementById('desistencia-box-'+id).classList.toggle('hidden');
 }
 async function confirmarDesistencia(id){
-  const p = PROCESSOS.find(x=>x.id===id);
-  const motivoEl = document.getElementById('desistencia-motivo-'+id);
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!p || !currentUser){
+    return;
+  }
+
+  const motivoEl = document.getElementById(
+    'desistencia-motivo-' + id
+  );
+
+  if(!motivoEl){
+    return;
+  }
+
   const motivo = motivoEl.value.trim();
-  if(!motivo){ toast('Descreva o motivo antes de confirmar.','error'); return; }
-  const stageAntes = STAGE_LABELS[p.stage] || '—';
-  p.comentarios.push({autor: currentUser.nome, texto: `Cliente desistiu: ${motivo}`, data: new Date()});
-  registrarMovimentacao(p, stageAntes, 'Sem responsável (desistência)');
-  registrarAtividade('desistencia', p);
-  // Observação: telefonesReu, comentarios e movimentacoes NÃO são apagados — ficam
-  // salvos no processo para quem reabrir ver que já houve uma tentativa antes.
-  // TODO(Firebase): await FirebaseAPI.update('processos', id, {responsavelId:null, stage:null});
+
+  if(!motivo){
+    toast(
+      'Descreva o motivo antes de confirmar.',
+      'error'
+    );
+
+    return;
+  }
+
+  const stageAntes =
+    STAGE_LABELS[p.stage] || '—';
+
+  // Garante que os históricos existam
+  if(!p.comentarios){
+    p.comentarios = [];
+  }
+
+  if(!p.movimentacoes){
+    p.movimentacoes = [];
+  }
+
+  // ----------------------------------------------------------
+  // COMENTÁRIO DA DESISTÊNCIA
+  // ----------------------------------------------------------
+
+  const comentarioDesistencia = {
+    autor: currentUser.nome,
+    autorId: currentUser.id,
+    texto: `Cliente desistiu: ${motivo}`,
+    data: new Date()
+  };
+
+  p.comentarios.push(comentarioDesistencia);
+
+  // ----------------------------------------------------------
+  // MOVIMENTAÇÃO
+  // ----------------------------------------------------------
+
+  registrarMovimentacao(
+    p,
+    stageAntes,
+    'Sem responsável (desistência)'
+  );
+
+  // ----------------------------------------------------------
+  // ATIVIDADE
+  // ----------------------------------------------------------
+
+  registrarAtividade(
+    'desistencia',
+    p
+  );
+
+  // ----------------------------------------------------------
+  // REMOVE O RESPONSÁVEL
+  // ----------------------------------------------------------
+
   p.responsavelId = null;
+  p.responsavelNome = null;
+
+  // Remove da carteira
   p.stage = null;
-  closeModal();
-  toast('Registrado. O processo voltou para "Processos" sem responsável.','success');
-  if(currentView==='carteira') renderCarteira(); else navigate('processos');
+
+  try {
+
+    await FirebaseAPI.update(
+      'processos',
+      id,
+      {
+        responsavelId: null,
+        responsavelNome: null,
+        stage: null,
+        comentarios: p.comentarios,
+        movimentacoes: p.movimentacoes
+      }
+    );
+
+    closeModal();
+
+    toast(
+      'Registrado. O processo voltou para "Processos" sem responsável.',
+      'success'
+    );
+
+    if(currentView === 'carteira'){
+      renderCarteira();
+    }else{
+      navigate('processos');
+    }
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao salvar desistência no Firebase:',
+      erro
+    );
+
+    toast(
+      'Não foi possível registrar a desistência.',
+      'error'
+    );
+  }
 }
 async function marcarEntradaPaga(id){
   const p = PROCESSOS.find(x=>x.id===id);
@@ -2776,17 +2879,72 @@ function renderComentariosList(p){
   `).join('');
 }
 async function adicionarComentario(id){
-  const p = PROCESSOS.find(x=>x.id===id);
-  const input = document.getElementById('comentario-input-'+id);
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!p || !currentUser){
+    return;
+  }
+
+  const input = document.getElementById('comentario-input-' + id);
+
+  if(!input){
+    return;
+  }
+
   const texto = input.value.trim();
-  if(!texto){ toast('Escreva algo antes de comentar.','error'); return; }
-  const comentario = {autor: currentUser.nome, texto, data: new Date()};
+
+  if(!texto){
+    toast('Escreva algo antes de comentar.', 'error');
+    return;
+  }
+
+  if(!p.comentarios){
+    p.comentarios = [];
+  }
+
+  const comentario = {
+    autor: currentUser.nome,
+    autorId: currentUser.id,
+    texto,
+    data: new Date()
+  };
+
   p.comentarios.push(comentario);
-  // TODO(Firebase): await FirebaseAPI.create(`processos/${id}/comentarios`, comentario);
-  input.value = '';
-  const listEl = document.getElementById('comentarios-list-'+id);
-  if(listEl) listEl.innerHTML = renderComentariosList(p);
-  toast('Comentário adicionado.','success');
+
+  try {
+
+    await FirebaseAPI.update('processos', id, {
+      comentarios: p.comentarios
+    });
+
+    input.value = '';
+
+    const listEl = document.getElementById(
+      'comentarios-list-' + id
+    );
+
+    if(listEl){
+      listEl.innerHTML = renderComentariosList(p);
+    }
+
+    toast('Comentário adicionado.', 'success');
+
+  } catch(erro) {
+
+    console.error(
+      'Erro ao salvar comentário no Firebase:',
+      erro
+    );
+
+    // desfaz a alteração local se o Firebase falhar
+    p.comentarios.pop();
+
+    toast(
+      'Não foi possível salvar o comentário.',
+      'error'
+    );
+  }
 }
 async function verificarTelefones(id){
   const p = PROCESSOS.find(x=>x.id===id);
