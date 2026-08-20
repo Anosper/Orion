@@ -1523,6 +1523,38 @@ function iniciarListenerProcessos() {
 
 }
 
+let unsubscribeAtividades = null;
+
+function iniciarListenerAtividades(){
+
+  if(unsubscribeAtividades){
+    unsubscribeAtividades();
+    unsubscribeAtividades = null;
+  }
+
+  unsubscribeAtividades = FirebaseAPI.listen(
+    'atividades',
+    lista => {
+
+      console.log(
+        '📚 Atividades recebidas do Firebase:',
+        lista
+      );
+
+      ATIVIDADES = lista.map(a => ({
+        ...a,
+        data: normalizarData(a.data)
+      }));
+
+      if(currentView === 'historico'){
+        renderHistorico();
+      }
+
+    },
+    'data'
+  );
+}
+
 /* ---------------- Processos ocultados individualmente (por usuário) ----------------
    Ocultar um processo em "Processos" é uma preferência PESSOAL: não afeta o
    que os outros usuários veem, nem remove o processo da base coletada.
@@ -1533,7 +1565,7 @@ let HIDDEN_PROCESSOS = {};
 function isHiddenForUser(p, userId){
   return (HIDDEN_PROCESSOS[userId] || []).includes(p.id);
 }
-function toggleOcultarProcesso(id){
+async function toggleOcultarProcesso(id){
   const uid = currentUser.id;
   const p = PROCESSOS.find(x=>x.id===id);
   if(!HIDDEN_PROCESSOS[uid]) HIDDEN_PROCESSOS[uid] = [];
@@ -1544,7 +1576,7 @@ function toggleOcultarProcesso(id){
   } else {
     HIDDEN_PROCESSOS[uid].push(id);
     toast('Processo ocultado da sua lista. Outros usuários continuam vendo normalmente.','success');
-    if(p) registrarAtividade('ocultado', p);
+    if(p) await registrarAtividade('ocultado', p);
   }
   // TODO(Firebase): await FirebaseAPI.update('preferencias_usuario', uid, {ocultos: HIDDEN_PROCESSOS[uid]});
   if(document.getElementById('modal-root')?.innerHTML) closeModal();
@@ -1603,20 +1635,61 @@ function iniciarListenerAgenda(){
     processoId, processoNumero, clienteNome, data}
    --------------------------------------------------------------------------- */
 let ATIVIDADES = [];
+
 // TODO(Firebase): substituir por FirebaseAPI.listen('atividades', lista=>{ ATIVIDADES=lista; if(currentView==='historico') renderHistorico(); }, 'data');
 const ATIVIDADE_CONFIG = {
   ocultado: { icone:'🚫', label:'ocultou o processo de' },
   desistencia: { icone:'❌', label:'registrou desistência do cliente' },
   entrada_paga: { icone:'💰', label:'confirmou pagamento da entrada de' }
 };
-function registrarAtividade(tipo, p){
-  ATIVIDADES.push({
-    id: 'at'+Date.now()+Math.random().toString(36).slice(2,7),
-    tipo, usuarioId: currentUser.id, usuarioNome: currentUser.nome,
-    processoId: p.id, processoNumero: p.numero, clienteNome: p.reu,
+async function registrarAtividade(tipo, p){
+
+  if(!p || !currentUser){
+    return;
+  }
+
+  const atividade = {
+    tipo,
+    usuarioId: currentUser.id,
+    usuarioNome: currentUser.nome,
+
+    // Responsável pelo processo no momento da atividade
+    responsavelId: p.responsavelId || null,
+
+    processoId: p.id,
+    processoNumero: p.numero,
+    clienteNome: p.reu,
+
     data: new Date()
-  });
-  // TODO(Firebase): await FirebaseAPI.create('atividades', {tipo, usuarioId:currentUser.id, usuarioNome:currentUser.nome, processoId:p.id, processoNumero:p.numero, clienteNome:p.reu, data: serverTimestamp()});
+  };
+
+  try {
+
+    const id = await FirebaseAPI.create(
+      'atividades',
+      atividade
+    );
+
+    atividade.id = id;
+
+    ATIVIDADES.push(atividade);
+
+    if(currentView === 'historico'){
+      renderHistorico();
+    }
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao salvar atividade no Firebase:',
+      erro
+    );
+
+    toast(
+      'Não foi possível salvar a atividade.',
+      'error'
+    );
+  }
 }
 
 /* ---------------- Credenciais de tribunal (mock) ---------------- */
@@ -1814,6 +1887,7 @@ async function handleLogin(e){
     iniciarListenerUsuarios();
     iniciarListenerProcessos();
     iniciarListenerAgenda();
+    iniciarListenerAtividades();
 
     navigate('processos');
 
@@ -1862,6 +1936,10 @@ async function handleLogout(){
   if(unsubscribeAgenda){
     unsubscribeAgenda();
     unsubscribeAgenda = null;
+  }
+  if(unsubscribeAtividades){
+    unsubscribeAtividades();
+    unsubscribeAtividades = null;
   }
 
   // Limpa a lista local de usuários online
@@ -2880,7 +2958,7 @@ async function confirmarDesistencia(id){
   // ATIVIDADE
   // ----------------------------------------------------------
 
-  registrarAtividade(
+  await registrarAtividade(
     'desistencia',
     p
   );
@@ -2939,7 +3017,7 @@ async function marcarEntradaPaga(id){
   const p = PROCESSOS.find(x=>x.id===id);
   registrarMovimentacao(p, 'Aguardando entrada', 'Fechado (entrada paga)');
   p.comentarios.push({autor: currentUser.nome, texto:'Entrada confirmada. Processo concluído e movido para o Histórico.', data:new Date()});
-  registrarAtividade('entrada_paga', p);
+  await registrarAtividade('entrada_paga', p);
   p.historico = true;
   p.historicoStatus = 'Fechado';
   p.ultimoContato = new Date();
@@ -3798,15 +3876,32 @@ function renderAgenda(){
    ========================================================================= */
 let historicoScopeUserId = 'own'; // 'own' | 'all' | userId específico (admin)
 function getAtividadesList(){
+
   let base = ATIVIDADES.slice();
-  if(currentUser.perfil!=='admin'){
-    base = base.filter(a=>a.usuarioId===currentUser.id);
-  } else if(historicoScopeUserId==='own'){
-    base = base.filter(a=>a.usuarioId===currentUser.id);
-  } else if(historicoScopeUserId!=='all'){
-    base = base.filter(a=>a.usuarioId===historicoScopeUserId);
+
+  if(currentUser.perfil !== 'admin'){
+
+    base = base.filter(
+      a => a.responsavelId === currentUser.id
+    );
+
+  } else if(historicoScopeUserId === 'own'){
+
+    base = base.filter(
+      a => a.responsavelId === currentUser.id
+    );
+
+  } else if(historicoScopeUserId !== 'all'){
+
+    base = base.filter(
+      a => a.responsavelId === historicoScopeUserId
+    );
+
   }
-  return base.sort((a,b)=>b.data-a.data);
+
+  return base.sort(
+    (a,b) => b.data - a.data
+  );
 }
 function renderAtividadesGrupos(list){
   if(!list.length) return `<div class="empty-state"><div class="ic">◧</div>Nenhuma atividade registrada ainda.</div>`;
