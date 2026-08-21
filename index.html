@@ -1884,21 +1884,84 @@ function isHiddenForUser(p, userId){
   return (HIDDEN_PROCESSOS[userId] || []).includes(p.id);
 }
 async function toggleOcultarProcesso(id){
+
   const uid = currentUser.id;
-  const p = PROCESSOS.find(x=>x.id===id);
-  if(!HIDDEN_PROCESSOS[uid]) HIDDEN_PROCESSOS[uid] = [];
-  const idx = HIDDEN_PROCESSOS[uid].indexOf(id);
-  if(idx >= 0){
-    HIDDEN_PROCESSOS[uid].splice(idx,1);
-    toast('Processo restaurado para a sua lista de Processos.','success');
-  } else {
-    HIDDEN_PROCESSOS[uid].push(id);
-    toast('Processo ocultado da sua lista. Outros usuários continuam vendo normalmente.','success');
-    if(p) await registrarAtividade('ocultado', p);
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!HIDDEN_PROCESSOS[uid]){
+    HIDDEN_PROCESSOS[uid] = [];
   }
-  // TODO(Firebase): await FirebaseAPI.update('preferencias_usuario', uid, {ocultos: HIDDEN_PROCESSOS[uid]});
-  if(document.getElementById('modal-root')?.innerHTML) closeModal();
-  if(currentView==='processos') renderProcessos();
+
+  const idx =
+    HIDDEN_PROCESSOS[uid].indexOf(id);
+
+  if(idx >= 0){
+
+    // Restaura o processo
+    HIDDEN_PROCESSOS[uid].splice(idx, 1);
+
+    toast(
+      'Processo restaurado para a sua lista de Processos.',
+      'success'
+    );
+
+  }else{
+
+    // Oculta o processo
+    HIDDEN_PROCESSOS[uid].push(id);
+
+    toast(
+      'Processo ocultado da sua lista. Outros usuários continuam vendo normalmente.',
+      'success'
+    );
+
+    if(p){
+      await registrarAtividade(
+        'ocultado',
+        p
+      );
+    }
+  }
+
+  try{
+
+    await FirebaseAPI.set(
+      'preferencias_usuario',
+      uid,
+      {
+        ocultos: HIDDEN_PROCESSOS[uid]
+      }
+    );
+
+    console.log(
+      '👁️ Preferências de processos salvas:',
+      HIDDEN_PROCESSOS[uid]
+    );
+
+  }catch(erro){
+
+    console.error(
+      'Erro ao salvar processos ocultados:',
+      erro
+    );
+
+    toast(
+      'Não foi possível salvar essa preferência.',
+      'error'
+    );
+
+  }
+
+  if(
+    document.getElementById('modal-root')?.innerHTML
+  ){
+    closeModal();
+  }
+
+  if(currentView === 'processos'){
+    renderProcessos();
+  }
 }
 
 /* ---------------- Agenda de retornos ----------------
