@@ -2314,24 +2314,81 @@ function openProcessoDetalhe(id){
 /* ---------------- Acompanhamento na carteira (etapas, desistência, histórico) ---------------- */
 const ACORDEAO_KEYS = ['historico','contato','proposta','fechada','contrato','entrada'];
 function renderCarteiraSection(p){
+
   const ativo = STAGE_ORDER.includes(p.stage);
+
   return `
     <div class="detail-item full" style="margin-top:14px;">
       <div class="k">Acompanhamento na carteira</div>
+
       ${ativo ? `
+
         <div style="margin:10px 0 4px;">
-          <button class="btn btn-danger btn-sm" onclick="toggleDesistenciaBox('${p.id}')">✕ Cliente desistiu</button>
-          <div id="desistencia-box-${p.id}" class="hidden" style="margin-top:10px;">
-            <textarea id="desistencia-motivo-${p.id}" placeholder="Descreva o motivo (ex: cliente disse que...)"
-              style="width:100%;min-height:56px;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:var(--card);color:var(--ink);resize:vertical;"></textarea>
+
+          <button
+            class="btn btn-danger btn-sm"
+            onclick="toggleDesistenciaBox('${p.id}')"
+          >
+            ✕ Cliente desistiu
+          </button>
+
+          <div
+            id="desistencia-box-${p.id}"
+            class="hidden"
+            style="margin-top:10px;"
+          >
+
+            <textarea
+              id="desistencia-motivo-${p.id}"
+              placeholder="Descreva o motivo (ex: cliente disse que...)"
+              style="width:100%;min-height:56px;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;background:var(--card);color:var(--ink);resize:vertical;"
+            ></textarea>
+
             <div style="display:flex;gap:8px;margin-top:8px;">
-              <button class="btn btn-danger btn-sm" onclick="confirmarDesistencia('${p.id}')">Confirmar desistência</button>
-              <button class="btn btn-ghost btn-sm" onclick="toggleDesistenciaBox('${p.id}')">Cancelar</button>
+
+              <button
+                class="btn btn-danger btn-sm"
+                onclick="confirmarDesistencia('${p.id}')"
+              >
+                Confirmar desistência
+              </button>
+
+              <button
+                class="btn btn-ghost btn-sm"
+                onclick="toggleDesistenciaBox('${p.id}')"
+              >
+                Cancelar
+              </button>
+
             </div>
+
           </div>
+
         </div>
-      ` : `<div class="badge badge-green" style="margin:10px 0 4px;">✓ Pago — acompanhando em Pós-venda</div>`}
+
+      ` : `
+
+        <div style="margin:10px 0 4px;">
+
+          <div class="badge badge-green">
+            ✓ Pago — acompanhando em Pós-venda
+          </div>
+
+          <div style="margin-top:8px;">
+            <button
+              class="btn btn-outline btn-sm"
+              onclick="pgEngano('${p.id}')"
+            >
+              PG engano
+            </button>
+          </div>
+
+        </div>
+
+      `}
+
       ${renderEtapaAccordion(p, ativo)}
+
     </div>
   `;
 }
@@ -3092,6 +3149,86 @@ async function marcarEntradaPaga(id){
 
     toast(
       'Não foi possível concluir o processo.',
+      'error'
+    );
+  }
+}
+
+async function pgEngano(id){
+
+  const p = PROCESSOS.find(x => x.id === id);
+
+  if(!p || !currentUser){
+    return;
+  }
+
+  const stageAnterior = p.stage;
+
+  if(!p.movimentacoes){
+    p.movimentacoes = [];
+  }
+
+  const movimentacao = {
+    data: new Date(),
+    autor: currentUser.nome,
+    de: 'Pago — Pós-venda',
+    para: 'Aguardando entrada',
+    motivo: 'PG engano'
+  };
+
+  p.movimentacoes.push(movimentacao);
+
+  // Volta para a carteira
+  p.stage = 'entrada';
+
+  // Deixa de ser considerado concluído
+  p.historico = false;
+  p.historicoStatus = null;
+  p.ultimoContato = new Date();
+
+  try {
+
+    await FirebaseAPI.update(
+      'processos',
+      id,
+      {
+        stage: 'entrada',
+        historico: false,
+        historicoStatus: null,
+        ultimoContato: p.ultimoContato,
+        movimentacoes: p.movimentacoes
+      }
+    );
+
+    closeModal();
+
+    toast(
+      'Processo devolvido para "Aguardando entrada".',
+      'success'
+    );
+
+    if(currentView === 'carteira'){
+      renderCarteira();
+    }else{
+      navigate(currentView);
+    }
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao reverter pagamento no Firebase:',
+      erro
+    );
+
+    p.stage = stageAnterior;
+
+    p.historico = true;
+    p.historicoStatus = 'Fechado';
+
+    p.movimentacoes.pop();
+
+    toast(
+      'Não foi possível devolver o processo para a carteira.',
       'error'
     );
   }
