@@ -1317,10 +1317,54 @@ function fmtDateTime(d){
     }
   )}`;
 }
-function registrarMovimentacao(p, de, para){
-  if(!p.movimentacoes) p.movimentacoes = [];
-  p.movimentacoes.push({data:new Date(), autor: currentUser.nome, de, para});
-  // TODO(Firebase): await FirebaseAPI.create(`processos/${p.id}/movimentacoes`, {autor:currentUser.nome, de, para, data: serverTimestamp()});
+async function registrarMovimentacao(p, de, para, extra = {}){
+
+  if(!p || !currentUser){
+    return;
+  }
+
+  if(!p.movimentacoes){
+    p.movimentacoes = [];
+  }
+
+  const movimentacao = {
+    data: new Date(),
+    autor: currentUser.nome,
+    autorId: currentUser.id,
+    de,
+    para,
+    ...extra
+  };
+
+  p.movimentacoes.push(movimentacao);
+
+  try {
+
+    await FirebaseAPI.update(
+      'processos',
+      p.id,
+      {
+        movimentacoes: p.movimentacoes
+      }
+    );
+
+    console.log(
+      '📝 Movimentação salva:',
+      movimentacao
+    );
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao salvar movimentação no Firebase:',
+      erro
+    );
+
+    // Desfaz a movimentação local se o Firebase falhar
+    p.movimentacoes.pop();
+
+    throw erro;
+  }
 }
 function maskPhone(){return `(${rndInt(11,89)}) 9${rndInt(1000,9999)}-${rndInt(1000,9999)}`;}
 function daysAgo(n){const d=new Date();d.setDate(d.getDate()-n);return d;}
@@ -1491,6 +1535,11 @@ function iniciarListenerProcessos() {
         comentarios: (p.comentarios || []).map(c => ({
           ...c,
           data: normalizarData(c.data)
+        })),
+
+        movimentacoes: (p.movimentacoes || []).map(m => ({
+          ...m,
+          data: normalizarData(m.data)
         })),
 
         propostaDataInicio: normalizarData(
@@ -3005,7 +3054,7 @@ async function confirmarDesistencia(id){
   // MOVIMENTAÇÃO
   // ----------------------------------------------------------
 
-  registrarMovimentacao(
+  await registrarMovimentacao(
     p,
     stageAntes,
     'Sem responsável (desistência)'
@@ -3085,7 +3134,7 @@ async function marcarEntradaPaga(id){
     p.comentarios = [];
   }
 
-  registrarMovimentacao(
+  await registrarMovimentacao(
     p,
     'Aguardando entrada',
     'Fechado (entrada paga)'
@@ -3789,24 +3838,22 @@ async function moverCardStage(id, stage){
 
   const dataMovimentacao = new Date();
 
-  // Atualização local imediata
   p.stage = stage;
   p.ultimoContato = dataMovimentacao;
 
-  // Registra movimentação
-  registrarMovimentacao(
-    p,
-    stageAntesLabel,
-    stageNovoLabel
-  );
-
   try {
+
+    await registrarMovimentacao(
+      p,
+      stageAntesLabel,
+      stageNovoLabel
+    );
 
     await FirebaseAPI.update(
       'processos',
       p.id,
       {
-        stage: stage,
+        stage,
         ultimoContato: dataMovimentacao
       }
     );
@@ -3819,11 +3866,10 @@ async function moverCardStage(id, stage){
   } catch(erro){
 
     console.error(
-      'Erro ao salvar mudança de etapa no Firebase:',
+      'Erro ao salvar mudança de etapa:',
       erro
     );
 
-    // Desfaz apenas a alteração local
     p.stage = stageAnterior;
 
     toast(
