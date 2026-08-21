@@ -1031,7 +1031,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     createUserWithEmailAndPassword,
     setPersistence,
     browserSessionPersistence,
-    onAuthStateChanged
+    onAuthStateChanged,
+    reauthenticateWithCredential,
+    EmailAuthProvider,
+    updatePassword
   };
 
   onAuthStateChanged(auth, firebaseUser => {
@@ -2454,17 +2457,125 @@ function openMinhaContaModal(){
   `);
 }
 async function saveMinhaSenha(){
-  const atual = document.getElementById('mc-atual').value;
-  const nova = document.getElementById('mc-nova').value;
-  const conf = document.getElementById('mc-conf').value;
-  if(atual !== currentUser.senha){ toast('Senha atual incorreta.','error'); return; }
-  if(nova.length < 6){ toast('A nova senha deve ter ao menos 6 caracteres.','error'); return; }
-  if(nova !== conf){ toast('As senhas não coincidem.','error'); return; }
-  currentUser.senha = nova;
-  // TODO(Firebase Auth): reautenticar e então:
-  // await updatePassword(auth.currentUser, nova);
-  closeModal();
-  toast('Senha atualizada com sucesso.','success');
+
+  const atual =
+    document.getElementById('mc-atual').value;
+
+  const nova =
+    document.getElementById('mc-nova').value;
+
+  const conf =
+    document.getElementById('mc-conf').value;
+
+  if(!atual){
+    toast(
+      'Digite sua senha atual.',
+      'error'
+    );
+    return;
+  }
+
+  if(nova.length < 6){
+    toast(
+      'A nova senha deve ter ao menos 6 caracteres.',
+      'error'
+    );
+    return;
+  }
+
+  if(nova !== conf){
+    toast(
+      'As senhas não coincidem.',
+      'error'
+    );
+    return;
+  }
+
+  const user =
+    window.FirebaseAuth.auth.currentUser;
+
+  if(!user){
+    toast(
+      'Sua sessão não está autenticada.',
+      'error'
+    );
+    return;
+  }
+
+  try {
+
+    // Reautentica com a senha atual
+    const credential =
+      window.FirebaseAuth.EmailAuthProvider.credential(
+        user.email,
+        atual
+      );
+
+    await window.FirebaseAuth.reauthenticateWithCredential(
+      user,
+      credential
+    );
+
+    // Troca a senha no Firebase Authentication
+    await window.FirebaseAuth.updatePassword(
+      user,
+      nova
+    );
+
+    // Não precisamos salvar senha no Firestore.
+    // O Firebase Authentication é quem controla a senha.
+
+    closeModal();
+
+    // Limpa os campos
+    document.getElementById('mc-atual').value = '';
+    document.getElementById('mc-nova').value = '';
+    document.getElementById('mc-conf').value = '';
+
+    toast(
+      'Senha atualizada com sucesso.',
+      'success'
+    );
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao alterar senha:',
+      erro
+    );
+
+    if(
+      erro.code === 'auth/invalid-credential' ||
+      erro.code === 'auth/wrong-password'
+    ){
+      toast(
+        'Senha atual incorreta.',
+        'error'
+      );
+      return;
+    }
+
+    if(erro.code === 'auth/weak-password'){
+      toast(
+        'A nova senha é muito fraca.',
+        'error'
+      );
+      return;
+    }
+
+    if(erro.code === 'auth/requires-recent-login'){
+      toast(
+        'Por segurança, faça login novamente antes de alterar sua senha.',
+        'error'
+      );
+      return;
+    }
+
+    toast(
+      'Não foi possível alterar a senha.',
+      'error'
+    );
+  }
 }
 
 /* =========================================================================
