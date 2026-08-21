@@ -1629,6 +1629,58 @@ function iniciarListenerUsuarios(){
 
       USERS = lista;
 
+      if(currentUser){
+
+        const usuarioAtualizado = lista.find(
+          u => u.id === currentUser.id
+        );
+
+        if(usuarioAtualizado){
+
+          currentUser = {
+            ...currentUser,
+            ...usuarioAtualizado
+          };
+
+          // Atualiza nome/avatar/cargo imediatamente
+          const avatar =
+            document.getElementById('topbar-avatar');
+
+          const nome =
+            document.getElementById('topbar-name');
+
+          const role =
+            document.getElementById('topbar-role');
+
+          if(avatar){
+            avatar.textContent =
+              initials(currentUser.nome);
+
+            avatar.style.background =
+              avatarColor(currentUser.nome);
+          }
+
+          if(nome){
+            nome.textContent =
+              currentUser.nome;
+          }
+
+          if(role){
+            role.textContent =
+              currentUser.perfil === 'admin'
+                ? 'Administrador'
+                : 'Usuário';
+          }
+
+          // Atualiza permissões/menus
+          document.getElementById('gestao-wrap').style.display =
+            currentUser.perfil === 'admin'
+              ? 'block'
+              : 'none';
+
+          applySidebarState();
+        }
+      }
 
       // ==========================================================
       // VERIFICA SE O USUÁRIO ATUAL AINDA EXISTE NO FIRESTORE
