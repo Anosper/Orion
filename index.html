@@ -2638,6 +2638,7 @@ function closeModal(){ document.getElementById('modal-root').innerHTML=''; }
    VIEW: PROCESSOS
    ========================================================================= */
 let procFilters = {q:'', tribunal:'', banco:'', classe:'', tipoPessoa:'', valorMin:'', valorMax:'', semResponsavel:false, somenteOcultados:false, ordenacao:'recentes'};
+let processosVisiveis = 20;
 let procFiltersOpen = false;
 
 function renderProcessos(){
@@ -2723,6 +2724,7 @@ function renderProcessos(){
           <tbody id="proc-tbody"></tbody>
         </table>
       </div>
+      <div id="proc-more-wrap"></div>
       <div id="proc-empty" class="empty-state hidden"><div class="ic">◧</div>Nenhum processo encontrado com esses filtros.</div>
     </div>
   `;
@@ -2750,65 +2752,296 @@ function clearProcFilters(){
   procFilters = {q:procFilters.q, tribunal:'', banco:'', classe:'', tipoPessoa:'', valorMin:'', valorMax:'', semResponsavel:false, somenteOcultados:false, ordenacao:'recentes'};
   renderProcessos();
 }
-function runProcFilters(){
-  procFilters.tribunal = document.getElementById('f-tribunal')?.value || '';
-  procFilters.banco = document.getElementById('f-banco')?.value || '';
-  procFilters.classe = document.getElementById('f-classe')?.value || '';
-  procFilters.tipoPessoa = document.getElementById('f-tipo')?.value || '';
-  procFilters.valorMin = document.getElementById('f-vmin')?.value || '';
-  procFilters.valorMax = document.getElementById('f-vmax')?.value || '';
-  procFilters.semResponsavel = document.getElementById('f-semresp')?.checked || false;
-  procFilters.somenteOcultados = document.getElementById('f-ocultos')?.checked || false;
-  procFilters.q = document.getElementById('proc-search')?.value || '';
+function runProcFilters(resetPagination = true){
 
-  let list = PROCESSOS.filter(p=>{
+  if(resetPagination){
+    processosVisiveis = 20;
+  }
+
+  procFilters.tribunal =
+    document.getElementById('f-tribunal')?.value || '';
+
+  procFilters.banco =
+    document.getElementById('f-banco')?.value || '';
+
+  procFilters.classe =
+    document.getElementById('f-classe')?.value || '';
+
+  procFilters.tipoPessoa =
+    document.getElementById('f-tipo')?.value || '';
+
+  procFilters.valorMin =
+    document.getElementById('f-vmin')?.value || '';
+
+  procFilters.valorMax =
+    document.getElementById('f-vmax')?.value || '';
+
+  procFilters.semResponsavel =
+    document.getElementById('f-semresp')?.checked || false;
+
+  procFilters.somenteOcultados =
+    document.getElementById('f-ocultos')?.checked || false;
+
+  procFilters.q =
+    document.getElementById('proc-search')?.value || '';
+
+  let list = PROCESSOS.filter(p => {
+
     const q = procFilters.q.toLowerCase();
-    const matchesQ = !q || [p.numero,p.autor,p.cpfCnpj,p.reu,p.reuCnpj,p.oab||''].filter(Boolean).some(v=>String(v).toLowerCase().includes(q));
-    const matchesTribunal = !procFilters.tribunal || p.tribunal===procFilters.tribunal;
-    const matchesBanco = !procFilters.banco || p.banco===procFilters.banco;
-    const matchesClasse = !procFilters.classe || p.classe===procFilters.classe;
-    const matchesTipo = !procFilters.tipoPessoa || p.tipoPessoa===procFilters.tipoPessoa;
-    const matchesMin = !procFilters.valorMin || p.valorCausa >= Number(procFilters.valorMin);
-    const matchesMax = !procFilters.valorMax || p.valorCausa <= Number(procFilters.valorMax);
-    const matchesSemResp = !procFilters.semResponsavel || !p.responsavelId;
-    const oculto = isHiddenForUser(p, currentUser.id);
-    const matchesOcultos = procFilters.somenteOcultados ? oculto : !oculto;
-    return matchesQ && matchesTribunal && matchesBanco && matchesClasse && matchesTipo && matchesMin && matchesMax && matchesSemResp && matchesOcultos;
+
+    const matchesQ =
+      !q ||
+      [
+        p.numero,
+        p.autor,
+        p.cpfCnpj,
+        p.reu,
+        p.reuCnpj,
+        p.oab || ''
+      ]
+        .filter(Boolean)
+        .some(v =>
+          String(v)
+            .toLowerCase()
+            .includes(q)
+        );
+
+    const matchesTribunal =
+      !procFilters.tribunal ||
+      p.tribunal === procFilters.tribunal;
+
+    const matchesBanco =
+      !procFilters.banco ||
+      p.banco === procFilters.banco;
+
+    const matchesClasse =
+      !procFilters.classe ||
+      p.classe === procFilters.classe;
+
+    const matchesTipo =
+      !procFilters.tipoPessoa ||
+      p.tipoPessoa === procFilters.tipoPessoa;
+
+    const matchesMin =
+      !procFilters.valorMin ||
+      p.valorCausa >= Number(procFilters.valorMin);
+
+    const matchesMax =
+      !procFilters.valorMax ||
+      p.valorCausa <= Number(procFilters.valorMax);
+
+    const matchesSemResp =
+      !procFilters.semResponsavel ||
+      !p.responsavelId;
+
+    const oculto =
+      isHiddenForUser(p, currentUser.id);
+
+    const matchesOcultos =
+      procFilters.somenteOcultados
+        ? oculto
+        : !oculto;
+
+    return (
+      matchesQ &&
+      matchesTribunal &&
+      matchesBanco &&
+      matchesClasse &&
+      matchesTipo &&
+      matchesMin &&
+      matchesMax &&
+      matchesSemResp &&
+      matchesOcultos
+    );
   });
 
-  if(procFilters.ordenacao==='valor'){ list.sort((a,b)=>b.valorCausa-a.valorCausa); }
-  else { list.sort((a,b)=>b.dataCaptacao-a.dataCaptacao); }
+  if(procFilters.ordenacao === 'valor'){
 
-  const tbody = document.getElementById('proc-tbody');
-  const empty = document.getElementById('proc-empty');
+    list.sort(
+      (a,b) => b.valorCausa - a.valorCausa
+    );
+
+  }else{
+
+    list.sort(
+      (a,b) => b.dataCaptacao - a.dataCaptacao
+    );
+
+  }
+
+  const tbody =
+    document.getElementById('proc-tbody');
+
+  const empty =
+    document.getElementById('proc-empty');
+
+  const moreWrap =
+    document.getElementById('proc-more-wrap');
+
   if(!tbody) return;
-  if(list.length===0){
-    tbody.innerHTML='';
+
+  if(list.length === 0){
+
+    tbody.innerHTML = '';
+
+    if(moreWrap){
+      moreWrap.innerHTML = '';
+    }
+
     empty.classList.remove('hidden');
-    empty.innerHTML = procFilters.somenteOcultados
-      ? `<div class="ic">◧</div>Você não ocultou nenhum processo.`
-      : `<div class="ic">◧</div>Nenhum processo encontrado com esses filtros.`;
+
+    empty.innerHTML =
+      procFilters.somenteOcultados
+        ? `<div class="ic">◧</div>Você não ocultou nenhum processo.`
+        : `<div class="ic">◧</div>Nenhum processo encontrado com esses filtros.`;
+
     return;
   }
+
   empty.classList.add('hidden');
-  tbody.innerHTML = list.map(p=>{
-    const resp = USERS.find(u=>u.id===p.responsavelId);
-    const oculto = isHiddenForUser(p, currentUser.id);
-    return `<tr onclick="openProcessoDetalhe('${p.id}')">
-      <td class="mono cell-strong" data-label="Número">${p.numero}</td>
-      <td data-label="Réu">${p.reu}<div class="cell-sub mono">${p.reuCnpj}</div></td>
-      <td data-label="Classe">${p.classe}</td>
-      <td data-label="Tribunal"><span class="badge badge-slate">${p.tribunal}</span></td>
-      <td data-label="Autor">${p.autor}<div class="cell-sub">${p.cpfCnpj}</div></td>
-      <td class="mono cell-strong" data-label="Valor da causa">${fmtBRL(p.valorCausa)}</td>
-      <td class="cell-sub" data-label="Data de distribuição">${fmtDate(p.dataDistribuicao)}</td>
-      <td data-label="Responsável">${resp? `<span class="avatar-mini" style="background:${avatarColor(resp.nome)}">${initials(resp.nome)}</span>${resp.nome.split(' ')[0]}` : `<span class="badge badge-amber">Sem dono</span>`}</td>
-      <td class="verif-cell" data-label="Verificação" data-proc-id="${p.id}" onclick="event.stopPropagation()">${renderVerificacaoInner(p, true)}</td>
-      <td data-label="Ação" onclick="event.stopPropagation()">
-        <button class="btn btn-sm btn-ghost" onclick="toggleOcultarProcesso('${p.id}')">${oculto?'↺ Restaurar':'🚫 Ocultar'}</button>
-      </td>
-    </tr>`;
-  }).join('');
+
+  // Mostra somente a quantidade permitida
+  const visibleList =
+    list.slice(0, processosVisiveis);
+
+  tbody.innerHTML =
+    visibleList.map(p => {
+
+      const resp =
+        USERS.find(
+          u => u.id === p.responsavelId
+        );
+
+      const oculto =
+        isHiddenForUser(
+          p,
+          currentUser.id
+        );
+
+      return `<tr onclick="openProcessoDetalhe('${p.id}')">
+        <td class="mono cell-strong" data-label="Número">${p.numero}</td>
+
+        <td data-label="Réu">
+          ${p.reu}
+          <div class="cell-sub mono">${p.reuCnpj}</div>
+        </td>
+
+        <td data-label="Classe">
+          ${p.classe}
+        </td>
+
+        <td data-label="Tribunal">
+          <span class="badge badge-slate">
+            ${p.tribunal}
+          </span>
+        </td>
+
+        <td data-label="Autor">
+          ${p.autor}
+          <div class="cell-sub">${p.cpfCnpj}</div>
+        </td>
+
+        <td
+          class="mono cell-strong"
+          data-label="Valor da causa"
+        >
+          ${fmtBRL(p.valorCausa)}
+        </td>
+
+        <td
+          class="cell-sub"
+          data-label="Data de distribuição"
+        >
+          ${fmtDate(p.dataDistribuicao)}
+        </td>
+
+        <td data-label="Responsável">
+          ${
+            resp
+              ? `<span class="avatar-mini" style="background:${avatarColor(resp.nome)}">${initials(resp.nome)}</span>${resp.nome.split(' ')[0]}`
+              : `<span class="badge badge-amber">Sem dono</span>`
+          }
+        </td>
+
+        <td
+          class="verif-cell"
+          data-label="Verificação"
+          data-proc-id="${p.id}"
+          onclick="event.stopPropagation()"
+        >
+          ${renderVerificacaoInner(p, true)}
+        </td>
+
+        <td
+          data-label="Ação"
+          onclick="event.stopPropagation()"
+        >
+          <button
+            class="btn btn-sm btn-ghost"
+            onclick="toggleOcultarProcesso('${p.id}')"
+          >
+            ${oculto ? '↺ Restaurar' : '🚫 Ocultar'}
+          </button>
+        </td>
+      </tr>`;
+
+    }).join('');
+
+  // Botão "Ver mais 20"
+  if(moreWrap){
+
+    if(list.length > processosVisiveis){
+
+      const restante =
+        list.length - processosVisiveis;
+
+      moreWrap.innerHTML = `
+        <div style="
+          display:flex;
+          justify-content:center;
+          margin-top:18px;
+          padding-top:14px;
+          border-top:1px solid var(--line);
+        ">
+          <button
+            class="btn btn-outline"
+            onclick="verMaisProcessos()"
+          >
+            ↓ Ver mais 20
+          </button>
+        </div>
+        <div style="
+          text-align:center;
+          margin-top:8px;
+          color:var(--slate-light);
+          font-size:11.5px;
+        ">
+          Mostrando ${visibleList.length} de ${list.length} processos
+        </div>
+      `;
+
+    }else{
+
+      moreWrap.innerHTML = `
+        <div style="
+          text-align:center;
+          margin-top:18px;
+          padding-top:14px;
+          border-top:1px solid var(--line);
+          color:var(--slate-light);
+          font-size:11.5px;
+        ">
+          Mostrando todos os ${list.length} processos encontrados
+        </div>
+      `;
+    }
+  }
+}
+function verMaisProcessos(){
+
+  processosVisiveis += 20;
+
+  runProcFilters(false);
 }
 function renderVerificacaoInner(p, compact){
   if(p.telefonesReu && p.telefonesReu.length){
