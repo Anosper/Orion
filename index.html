@@ -1953,56 +1953,315 @@ let unsubscribeProcessos = null;
 function iniciarListenerProcessos() {
 
   if (unsubscribeProcessos) {
+
     unsubscribeProcessos();
+
     unsubscribeProcessos = null;
+
   }
 
   unsubscribeProcessos = FirebaseAPI.listen(
+
     'processos',
+
     lista => {
 
-      console.log('🔥 Processos recebidos do Firebase:', lista);
+      console.log(
+        '🔥 Processos recebidos do Firebase:',
+        lista
+      );
 
-      PROCESSOS = lista.map(p => ({
+      /*
+       * ============================================================
+       * PRIMEIRA CARGA
+       * ============================================================
+       *
+       * Na primeira vez que o listener receber os processos,
+       * todos eles passam a ser conhecidos pelo usuário.
+       */
+
+      if (processosConhecidos.size === 0) {
+
+        lista.forEach(p => {
+
+          if (p.id) {
+            processosConhecidos.add(p.id);
+          }
+
+        });
+
+      }
+
+      /*
+       * ============================================================
+       * PROCESSAMENTO DOS PROCESSOS
+       * ============================================================
+       */
+
+      PROCESSOS = lista
+
+        .filter(p => {
+
+          /*
+           * Tempo real ligado:
+           * mostra todos os processos normalmente.
+           */
+          if (processosTempoRealAtivo) {
+
+            if (p.id) {
+              processosConhecidos.add(p.id);
+            }
+
+            return true;
+
+          }
+
+          /*
+           * Tempo real pausado:
+           *
+           * Só mantém processos que já eram conhecidos.
+           *
+           * Processos novos continuam no Firebase,
+           * mas não entram na lista exibida.
+           */
+          return processosConhecidos.has(p.id);
+
+        })
+
+        .map(p => ({
+
+          ...p,
+
+          comentarios: (p.comentarios || []).map(c => ({
+
+            ...c,
+
+            data: normalizarData(c.data)
+
+          })),
+
+          movimentacoes: (p.movimentacoes || []).map(m => ({
+
+            ...m,
+
+            data: normalizarData(m.data)
+
+          })),
+
+          propostaDataInicio: normalizarData(
+            p.propostaDataInicio
+          ),
+
+          vendaDataInicio: normalizarData(
+            p.vendaDataInicio
+          ),
+
+          // Compatibilidade com o formato usado pelo Orion
+          valorCausa:
+            typeof p.valor_causa === 'number'
+
+              ? p.valor_causa
+
+              : Number(
+
+                  String(p.valor_causa || '')
+
+                    .replace(/[^\d,.-]/g, '')
+
+                    .replace(/\./g, '')
+
+                    .replace(',', '.')
+
+                ),
+
+          dataDistribuicao: p.data_distribuicao,
+
+          reuCnpj: p.documento_reu
+
+        }));
+
+      /*
+       * ============================================================
+       * ATUALIZA A INTERFACE
+       * ============================================================
+       */
+
+      if (currentUser) {
+
+        navigate(window.currentView);
+
+      }
+
+    }
+
+  );
+
+}
+
+async function toggleProcessosTempoReal() {
+
+  /*
+   * Inverte o estado atual
+   */
+  processosTempoRealAtivo = !processosTempoRealAtivo;
+
+  /*
+   * ============================================================
+   * ATIVANDO
+   * ============================================================
+   */
+
+  if (processosTempoRealAtivo) {
+
+    console.log(
+      '🟢 Tempo real de chegada de processos ativado.'
+    );
+
+    try {
+
+      /*
+       * Busca novamente todos os processos diretamente
+       * do Firestore.
+       */
+      const listaAtualizada =
+        await FirebaseAPI.getAll('processos');
+
+      console.log(
+        '🔄 Processos sincronizados após ativar tempo real:',
+        listaAtualizada
+      );
+
+      /*
+       * Todos os processos encontrados passam a ser conhecidos.
+       */
+      listaAtualizada.forEach(p => {
+
+        if (p.id) {
+
+          processosConhecidos.add(p.id);
+
+        }
+
+      });
+
+      /*
+       * O listener continuará funcionando normalmente.
+       *
+       * Aqui apenas atualizamos a lista imediatamente,
+       * sem precisar esperar outro disparo do onSnapshot.
+       */
+
+      PROCESSOS = listaAtualizada.map(p => ({
+
         ...p,
 
         comentarios: (p.comentarios || []).map(c => ({
+
           ...c,
+
           data: normalizarData(c.data)
+
         })),
 
         movimentacoes: (p.movimentacoes || []).map(m => ({
+
           ...m,
+
           data: normalizarData(m.data)
+
         })),
 
         propostaDataInicio: normalizarData(
           p.propostaDataInicio
         ),
+
         vendaDataInicio: normalizarData(
           p.vendaDataInicio
         ),
 
         // Compatibilidade com o formato usado pelo Orion
-        valorCausa: typeof p.valor_causa === 'number'
-          ? p.valor_causa
-          : Number(
-              String(p.valor_causa || '')
-                .replace(/[^\d,.-]/g, '')
-                .replace(/\./g, '')
-                .replace(',', '.')
-            ),
+        valorCausa:
+          typeof p.valor_causa === 'number'
+
+            ? p.valor_causa
+
+            : Number(
+
+                String(p.valor_causa || '')
+
+                  .replace(/[^\d,.-]/g, '')
+
+                  .replace(/\./g, '')
+
+                  .replace(',', '.')
+
+              ),
 
         dataDistribuicao: p.data_distribuicao,
+
         reuCnpj: p.documento_reu
+
       }));
 
+      /*
+       * Atualiza a tela
+       */
       if (currentUser) {
-      navigate(window.currentView);
+
+        navigate(window.currentView);
+
       }
 
+      toast(
+        'Tempo real ativado. Processos novos foram sincronizados.',
+        'success'
+      );
+
+    } catch (erro) {
+
+      console.error(
+        '❌ Erro ao sincronizar processos:',
+        erro
+      );
+
+      /*
+       * Se a sincronização falhar,
+       * voltamos para pausado.
+       */
+      processosTempoRealAtivo = false;
+
+      toast(
+        'Não foi possível sincronizar os processos.',
+        'error'
+      );
+
     }
-  );
+
+  }
+
+  /*
+   * ============================================================
+   * PAUSANDO
+   * ============================================================
+   */
+
+  else {
+
+    console.log(
+      '⚪ Tempo real de chegada de processos pausado.'
+    );
+
+    toast(
+      'Entrada de novos processos pausada.',
+      'success'
+    );
+
+  }
+
+  /*
+   * Atualiza o botão
+   */
+  renderProcessos();
 
 }
 
@@ -2802,6 +3061,9 @@ let procFilters = {q:'', tribunal:'', banco:'', classe:'', tipoPessoa:'', valorM
 let processosVisiveis = 20;
 let procFiltersOpen = false;
 
+let processosTempoRealAtivo = true;
+let processosConhecidos = new Set();
+
 function renderProcessos(){
   const c = document.getElementById('content');
   const total = PROCESSOS.length;
@@ -2823,6 +3085,18 @@ function renderProcessos(){
         <h1 class="view-title">Processos</h1>
         <p class="view-sub">Processos públicos coletados automaticamente nos tribunais configurados.</p>
       </div>
+
+      <button
+        class="btn btn-outline"
+        onclick="toggleProcessosTempoReal()"
+        title="${processosTempoRealAtivo
+          ? 'Novos processos estão entrando automaticamente'
+          : 'Entrada de novos processos está pausada'}"
+      >
+        ${processosTempoRealAtivo
+          ? '🟢 Tempo real'
+          : '⚪ Tempo real'}
+      </button>
     </div>
 
     <div class="stat-grid">
