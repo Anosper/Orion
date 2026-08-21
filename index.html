@@ -873,7 +873,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     signInWithEmailAndPassword,
     signOut,
     sendPasswordResetEmail,
-    createUserWithEmailAndPassword
+    createUserWithEmailAndPassword,
+    setPersistence,
+    browserSessionPersistence
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getDatabase,
@@ -1025,7 +1027,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     signInWithEmailAndPassword,
     signOut,
     sendPasswordResetEmail,
-    createUserWithEmailAndPassword
+    createUserWithEmailAndPassword,
+    setPersistence,
+    browserSessionPersistence
   };
 </script>
 
@@ -1870,6 +1874,11 @@ async function handleLogin(e){
   try {
 
     console.log('🔥 Tentando login Firebase...');
+
+    await window.FirebaseAuth.setPersistence(
+      window.FirebaseAuth.auth,
+      window.FirebaseAuth.browserSessionPersistence
+    );
 
     const credencial =
       await window.FirebaseAuth.signInWithEmailAndPassword(
