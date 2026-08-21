@@ -1310,6 +1310,8 @@ async function restaurarSessaoFirebase(firebaseUser){
     // Restaura o usuário do Orion
     currentUser = user;
 
+    await carregarPreferenciasUsuario(currentUser.id);
+
     // ==============================
     // RESTAURA INTERFACE
     // ==============================
