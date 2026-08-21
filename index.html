@@ -2530,10 +2530,10 @@ async function saveMinhaSenha(){
 
     closeModal();
 
-    // Limpa os campos
-    document.getElementById('mc-atual').value = '';
-    document.getElementById('mc-nova').value = '';
-    document.getElementById('mc-conf').value = '';
+    toast(
+      'Senha atualizada com sucesso.',
+      'success'
+    );
 
     toast(
       'Senha atualizada com sucesso.',
