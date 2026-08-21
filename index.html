@@ -1040,8 +1040,12 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     updatePassword
   };
 
-  let currentView = 'processos';
-  console.log('✅ currentView inicial:', currentView);
+  var currentView = 'processos';
+  console.log(
+    '✅ currentView global:',
+    currentView,
+    window.currentView
+  );
 
   onAuthStateChanged(auth, firebaseUser => {
 
