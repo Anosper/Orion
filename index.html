@@ -1033,6 +1033,25 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     browserSessionPersistence,
     onAuthStateChanged
   };
+
+  onAuthStateChanged(auth, firebaseUser => {
+
+    console.log(
+      '🔥 Estado do Firebase Auth:',
+      firebaseUser
+        ? `usuário ${firebaseUser.uid}`
+        : 'deslogado'
+    );
+
+    window.dispatchEvent(
+      new CustomEvent('firebase-auth-state-changed', {
+        detail: {
+          user: firebaseUser
+        }
+      })
+    );
+
+  });
 </script>
 
 <script>
@@ -1384,9 +1403,11 @@ async function restaurarSessaoFirebase(firebaseUser){
   }
 }
 
-window.FirebaseAuth.onAuthStateChanged(
-  window.FirebaseAuth.auth,
-  firebaseUser => {
+window.addEventListener(
+  'firebase-auth-state-changed',
+  event => {
+
+    const firebaseUser = event.detail.user;
 
     if(firebaseUser){
       restaurarSessaoFirebase(firebaseUser);
@@ -1394,7 +1415,6 @@ window.FirebaseAuth.onAuthStateChanged(
 
   }
 );
-
 
 async function pararPresenca(){
 
