@@ -1436,9 +1436,148 @@ async function pararPresenca(){
 
 
 /* ---------------- Dados de apoio ---------------- */
-const TRIBUNAIS = ['TJSP','TJRJ','TJMG','TJRS','TRF-1','TRF-3','TJBA','TJPR'];
-const BANCOS = ['Banco Nova Era','Crédito Sul','Finance One','Banco Horizonte','Multiplus Bank'];
-const CLASSES = ['Ação Revisional','Indenização por Danos Morais','Repetição de Indébito','Busca e Apreensão','Ação de Cobrança'];
+const BANCOS = [
+  'Bradesco',
+  'Itau',
+  'Brasil',
+  'Caixa'
+];
+
+const TRIBUNAIS_MAP = {
+  '8.01': 'TJAC',
+  '8.02': 'TJAL',
+  '8.03': 'TJAP',
+  '8.04': 'TJAM',
+  '8.05': 'TJBA',
+  '8.06': 'TJCE',
+  '8.07': 'TJDF',
+  '8.08': 'TJES',
+  '8.09': 'TJGO',
+  '8.10': 'TJMA',
+  '8.11': 'TJMT',
+  '8.12': 'TJMS',
+  '8.13': 'TJMG',
+  '8.14': 'TJPA',
+  '8.15': 'TJPB',
+  '8.16': 'TJPR',
+  '8.17': 'TJPE',
+  '8.18': 'TJPI',
+  '8.19': 'TJRJ',
+  '8.20': 'TJRN',
+  '8.21': 'TJRS',
+  '8.22': 'TJRO',
+  '8.23': 'TJRR',
+  '8.24': 'TJSC',
+  '8.25': 'TJSE',
+  '8.26': 'TJSP',
+  '8.27': 'TJTO'
+};
+
+function getTribunalDoProcesso(p){
+
+  const numero = String(p?.numero || '');
+
+  const match = numero.match(
+    /\b8\.(\d{2})\b/
+  );
+
+  if(!match){
+    return '';
+  }
+
+  const codigo = `8.${match[1]}`;
+
+  return TRIBUNAIS_MAP[codigo] || '';
+}
+function getTipoPessoaDoProcesso(p){
+
+  const documento = String(
+    p?.reuCnpj || p?.documento_reu || ''
+  ).replace(/\D/g, '');
+
+  if(documento.length === 11){
+    return 'fisica';
+  }
+
+  if(documento.length === 14){
+    return 'juridica';
+  }
+
+  return '';
+}
+function getBancoDoProcesso(p){
+
+  const autor = String(
+    p?.autor || ''
+  ).toLowerCase();
+
+  if(autor.includes('bradesco')){
+    return 'Bradesco';
+  }
+
+  if(
+    autor.includes('itau') ||
+    autor.includes('itaú')
+  ){
+    return 'Itau';
+  }
+
+  if(autor.includes('brasil')){
+    return 'Brasil';
+  }
+
+  if(autor.includes('caixa')){
+    return 'Caixa';
+  }
+
+  return '';
+}
+function getClassesDisponiveis(){
+
+  const mapa = new Map();
+
+  PROCESSOS.forEach(p => {
+
+    const classe =
+      String(p?.classe || '').trim();
+
+    if(!classe){
+      return;
+    }
+
+    const chave = classe.toLowerCase();
+
+    if(!mapa.has(chave)){
+      mapa.set(chave, classe);
+    }
+
+  });
+
+  return Array.from(mapa.values())
+    .sort((a,b) =>
+      a.localeCompare(b, 'pt-BR')
+    );
+}
+function getTribunaisDisponiveis(){
+
+  const encontrados = new Set();
+
+  PROCESSOS.forEach(p => {
+
+    const tribunal =
+      getTribunalDoProcesso(p);
+
+    if(tribunal){
+      encontrados.add(tribunal);
+    }
+
+  });
+
+  return Object.values(TRIBUNAIS_MAP)
+    .filter(tribunal =>
+      encontrados.has(tribunal)
+    );
+}
 
 function rnd(arr){return arr[Math.floor(Math.random()*arr.length)];}
 function rndInt(a,b){return Math.floor(Math.random()*(b-a+1))+a;}
@@ -2649,6 +2788,12 @@ function renderProcessos(){
   const valorTotal = PROCESSOS.reduce((s,p)=>s+p.valorCausa,0);
   const valorHoje = captadosHoje.reduce((s,p)=>s+p.valorCausa,0);
 
+  const tribunaisDisponiveis =
+    getTribunaisDisponiveis();
+
+  const classesDisponiveis =
+    getClassesDisponiveis();
+
   c.innerHTML = `
     <div class="view-header">
       <div>
@@ -2683,13 +2828,28 @@ function renderProcessos(){
       <div class="filters-panel ${procFiltersOpen?'open':''}">
         <div class="filters-grid">
           <div class="field"><label>Tribunal</label>
-            <select id="f-tribunal">${optList(TRIBUNAIS, procFilters.tribunal)}</select>
+            <select id="f-tribunal">
+              ${optList(
+                tribunaisDisponiveis,
+                procFilters.tribunal
+              )}
+            </select>
           </div>
           <div class="field"><label>Banco</label>
-            <select id="f-banco">${optList(BANCOS, procFilters.banco)}</select>
+            <select id="f-banco">
+              ${optList(
+                BANCOS,
+                procFilters.banco
+              )}
+            </select>
           </div>
           <div class="field"><label>Classe processual</label>
-            <select id="f-classe">${optList(CLASSES, procFilters.classe)}</select>
+            <select id="f-classe">
+              ${optList(
+                classesDisponiveis,
+                procFilters.classe
+              )}
+            </select>
           </div>
           <div class="field"><label>Tipo de pessoa</label>
             <select id="f-tipo">
@@ -2806,21 +2966,33 @@ function runProcFilters(resetPagination = true){
             .includes(q)
         );
 
+    const tribunalProcesso =
+      getTribunalDoProcesso(p);
+
+    const bancoProcesso =
+      getBancoDoProcesso(p);
+
+    const tipoPessoaProcesso =
+      getTipoPessoaDoProcesso(p);
+
+    const classeProcesso =
+      String(p?.classe || '').trim();
+
     const matchesTribunal =
       !procFilters.tribunal ||
-      p.tribunal === procFilters.tribunal;
+      tribunalProcesso === procFilters.tribunal;
 
     const matchesBanco =
       !procFilters.banco ||
-      p.banco === procFilters.banco;
+      bancoProcesso === procFilters.banco;
 
     const matchesClasse =
       !procFilters.classe ||
-      p.classe === procFilters.classe;
+      classeProcesso === procFilters.classe;
 
     const matchesTipo =
       !procFilters.tipoPessoa ||
-      p.tipoPessoa === procFilters.tipoPessoa;
+      tipoPessoaProcesso === procFilters.tipoPessoa;
 
     const matchesMin =
       !procFilters.valorMin ||
