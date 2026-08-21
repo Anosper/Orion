@@ -1040,7 +1040,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     updatePassword
   };
 
-  var currentView = 'processos';
+  
+  window.currentView = 'processos';
   console.log(
     '✅ currentView global:',
     currentView,
@@ -1862,8 +1863,8 @@ function iniciarListenerUsuarios(){
           if(
             deixouDeSerAdmin &&
             (
-              currentView === 'usuarios' ||
-              currentView === 'credenciais'
+              window.currentView === 'usuarios' ||
+              window.currentView === 'credenciais'
             )
           ){
             navigate('processos');
@@ -1939,7 +1940,7 @@ function iniciarListenerUsuarios(){
       // ATUALIZA A TELA DE USUÁRIOS
       // ==========================================================
 
-      if(currentView === 'usuarios'){
+      if(window.currentView === 'usuarios'){
         renderUsuarios();
       }
 
@@ -1997,7 +1998,7 @@ function iniciarListenerProcessos() {
       }));
 
       if (currentUser) {
-      navigate(currentView);
+      navigate(window.currentView);
       }
 
     }
@@ -2028,7 +2029,7 @@ function iniciarListenerAtividades(){
         data: normalizarData(a.data)
       }));
 
-      if(currentView === 'historico'){
+      if(window.currentView === 'historico'){
         renderHistorico();
       }
 
@@ -2165,7 +2166,7 @@ async function toggleOcultarProcesso(id){
     closeModal();
   }
 
-  if(currentView === 'processos'){
+  if(window.currentView === 'processos'){
     renderProcessos();
   }
 }
@@ -2205,7 +2206,7 @@ function iniciarListenerAgenda(){
 
       updateAgendaBadge();
 
-      if(currentView === 'agenda'){
+      if(window.currentView === 'agenda'){
         renderAgenda();
       }
 
@@ -2261,7 +2262,7 @@ async function registrarAtividade(tipo, p){
 
     ATIVIDADES.push(atividade);
 
-    if(currentView === 'historico'){
+    if(window.currentView === 'historico'){
       renderHistorico();
     }
 
@@ -2759,7 +2760,7 @@ function navigate(view){
   if((view==='credenciais'||view==='usuarios') && currentUser.perfil!=='admin'){
     toast('Acesso restrito a administradores.','error'); return;
   }
-  currentView = view;
+  window.currentView = view;
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===view));
   if(view==='credenciais'||view==='usuarios'){
     document.getElementById('gestao-parent').classList.add('open');
