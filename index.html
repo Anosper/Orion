@@ -4413,27 +4413,50 @@ function renderAgenda(){
    VIEW: HISTÓRICO — log de atividades (não mais tabela de processos)
    ========================================================================= */
 let historicoScopeUserId = 'own'; // 'own' | 'all' | userId específico (admin)
+
 function getAtividadesList(){
 
   let base = ATIVIDADES.slice();
 
   if(currentUser.perfil !== 'admin'){
 
-    base = base.filter(
-      a => a.responsavelId === currentUser.id
-    );
+    base = base.filter(a => {
+
+      // Ocultar processo é uma ação privada
+      // para quem realizou a ocultação.
+      if(a.tipo === 'ocultado'){
+        return a.usuarioId === currentUser.id;
+      }
+
+      // Demais atividades pertencem ao responsável
+      // pelo processo.
+      return a.responsavelId === currentUser.id;
+
+    });
 
   } else if(historicoScopeUserId === 'own'){
 
-    base = base.filter(
-      a => a.responsavelId === currentUser.id
-    );
+    base = base.filter(a => {
+
+      if(a.tipo === 'ocultado'){
+        return a.usuarioId === currentUser.id;
+      }
+
+      return a.responsavelId === currentUser.id;
+
+    });
 
   } else if(historicoScopeUserId !== 'all'){
 
-    base = base.filter(
-      a => a.responsavelId === historicoScopeUserId
-    );
+    base = base.filter(a => {
+
+      if(a.tipo === 'ocultado'){
+        return a.usuarioId === historicoScopeUserId;
+      }
+
+      return a.responsavelId === historicoScopeUserId;
+
+    });
 
   }
 
