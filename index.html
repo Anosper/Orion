@@ -1040,6 +1040,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     updatePassword
   };
 
+  let currentView = 'processos';
+
   onAuthStateChanged(auth, firebaseUser => {
 
     console.log(
@@ -1472,6 +1474,15 @@ const TRIBUNAIS_MAP = {
   '8.26': 'TJSP',
   '8.27': 'TJTO'
 };
+
+const TRIBUNAIS_CREDENCIAIS = [
+  'TJAC',
+  'TJAL',
+  'TJAP',
+  'TJAM',
+  'TJBA',
+  'TJCE'
+];
 
 function getTribunalDoProcesso(p){
 
@@ -2263,9 +2274,14 @@ async function registrarAtividade(tipo, p){
 }
 
 /* ---------------- Credenciais de tribunal (mock) ---------------- */
-let CREDENCIAIS = TRIBUNAIS.slice(0,6).map((t,i)=>({
-  id:'c'+i, tribunal:t, usuarioRobo:`bot.${t.toLowerCase()}@orion.com`, senha:'••••••••',
-  ativo: i!==4, ultimaExecucao: daysAgo(rndInt(0,3)), novosColetados: rndInt(0,14)
+let CREDENCIAIS = TRIBUNAIS_CREDENCIAIS.map((t,i)=>({
+  id:'c'+i,
+  tribunal:t,
+  usuarioRobo:`bot.${t.toLowerCase()}@orion.com`,
+  senha:'••••••••',
+  ativo:i!==4,
+  ultimaExecucao:daysAgo(rndInt(0,3)),
+  novosColetados:rndInt(0,14)
 }));
 
 /* =========================================================================
@@ -2733,7 +2749,6 @@ function toggleGestaoMenu(){
   document.getElementById('gestao-sub').classList.toggle('open');
 }
 
-let currentView = 'processos';
 function navigate(view){
   if((view==='credenciais'||view==='usuarios') && currentUser.perfil!=='admin'){
     toast('Acesso restrito a administradores.','error'); return;
@@ -5201,7 +5216,12 @@ function openCredencialForm(id){
     <div class="modal-body">
       <div class="form-grid">
         <div class="form-field full"><label>Tribunal</label>
-          <select id="cr-tribunal">${TRIBUNAIS.map(t=>`<option ${cr&&cr.tribunal===t?'selected':''}>${t}</option>`).join('')}</select>
+          <select id="cr-tribunal">${TRIBUNAIS_CREDENCIAIS.map(t => `
+              <option ${cr && cr.tribunal === t ? 'selected' : ''}>
+                ${t}
+              </option>
+            `).join('')}
+          </select>
         </div>
         <div class="form-field full"><label>Usuário do robô</label><input id="cr-user" value="${cr?cr.usuarioRobo:''}" placeholder="bot.tribunal@orion.com"></div>
         <div class="form-field full"><label>Senha</label><input id="cr-pass" type="password" placeholder="${cr?'Deixe em branco para manter':''}"></div>
