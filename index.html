@@ -1040,6 +1040,9 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     updatePassword
   };
 
+  let currentView = 'processos';
+  console.log('✅ currentView inicial:', currentView);
+
   onAuthStateChanged(auth, firebaseUser => {
 
     console.log(
@@ -1108,7 +1111,7 @@ let USERS = [
   {id:'u4', nome:'Fernanda Cruz', email:'fernanda@orion.com', senha:'user123', perfil:'usuario'},
 ];
 let currentUser = null;
-let currentView = 'processos';
+
 let sidebarCollapsed = window.innerWidth <= 900;
 
 /* =========================================================================
