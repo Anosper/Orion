@@ -875,7 +875,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     sendPasswordResetEmail,
     createUserWithEmailAndPassword,
     setPersistence,
-    browserSessionPersistence
+    browserSessionPersistence,
+    onAuthStateChanged
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
   import {
     getDatabase,
@@ -1029,7 +1030,8 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
     sendPasswordResetEmail,
     createUserWithEmailAndPassword,
     setPersistence,
-    browserSessionPersistence
+    browserSessionPersistence,
+    onAuthStateChanged
   };
 </script>
 
@@ -1243,6 +1245,155 @@ function renderOnlineBadge(){
       `)
       .join('');
 }
+
+async function restaurarSessaoFirebase(firebaseUser){
+
+  if(!firebaseUser){
+    return;
+  }
+
+  // Se o Orion já carregou esse usuário pelo login normal,
+  // não inicializa tudo novamente.
+  if(currentUser){
+    return;
+  }
+
+  try {
+
+    console.log(
+      '🔄 Firebase restaurou a sessão:',
+      firebaseUser.uid,
+      firebaseUser.email
+    );
+
+    // Busca o perfil do usuário no Firestore
+    const perfis =
+      await FirebaseAPI.getAll('usuarios');
+
+    const user = perfis.find(
+      u => u.id === firebaseUser.uid
+    );
+
+    // Perfil não existe mais
+    if(!user){
+
+      console.warn(
+        '🚨 Usuário autenticado, mas perfil não existe no Firestore.'
+      );
+
+      await window.FirebaseAuth.signOut(
+        window.FirebaseAuth.auth
+      );
+
+      return;
+    }
+
+    // Restaura o usuário do Orion
+    currentUser = user;
+
+    // ==============================
+    // RESTAURA INTERFACE
+    // ==============================
+
+    document.title = 'Orion';
+
+    document
+      .getElementById('login-screen')
+      ?.classList.add('hidden');
+
+    document
+      .getElementById('main-screen')
+      ?.classList.remove('hidden');
+
+    document.getElementById(
+      'topbar-avatar'
+    ).textContent =
+      initials(user.nome);
+
+    document.getElementById(
+      'topbar-avatar'
+    ).style.background =
+      avatarColor(user.nome);
+
+    document.getElementById(
+      'topbar-name'
+    ).textContent =
+      user.nome;
+
+    document.getElementById(
+      'topbar-role'
+    ).textContent =
+      user.perfil === 'admin'
+        ? 'Administrador'
+        : 'Usuário';
+
+    document.getElementById(
+      'gestao-wrap'
+    ).style.display =
+      user.perfil === 'admin'
+        ? 'block'
+        : 'none';
+
+    // ==============================
+    // RESTAURA PRESENÇA
+    // ==============================
+
+    iniciarListenerPresenca();
+    goOnline(user);
+
+    // ==============================
+    // RESTAURA LISTENERS
+    // ==============================
+
+    iniciarListenerUsuarios();
+    iniciarListenerProcessos();
+    iniciarListenerAgenda();
+    iniciarListenerAtividades();
+
+    // ==============================
+    // RESTAURA INTERFACE
+    // ==============================
+
+    applySidebarState();
+    updateAgendaBadge();
+
+    navigate(
+      currentView || 'processos'
+    );
+
+    console.log(
+      '✅ Sessão do Orion restaurada automaticamente.'
+    );
+
+  } catch(erro){
+
+    console.error(
+      '❌ Erro ao restaurar sessão do Firebase:',
+      erro
+    );
+
+    currentUser = null;
+
+    document
+      .getElementById('main-screen')
+      ?.classList.add('hidden');
+
+    document
+      .getElementById('login-screen')
+      ?.classList.remove('hidden');
+  }
+}
+
+window.FirebaseAuth.onAuthStateChanged(
+  window.FirebaseAuth.auth,
+  firebaseUser => {
+
+    if(firebaseUser){
+      restaurarSessaoFirebase(firebaseUser);
+    }
+
+  }
+);
 
 
 async function pararPresenca(){
