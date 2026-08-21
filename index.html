@@ -1883,6 +1883,37 @@ let HIDDEN_PROCESSOS = {};
 function isHiddenForUser(p, userId){
   return (HIDDEN_PROCESSOS[userId] || []).includes(p.id);
 }
+
+async function carregarPreferenciasUsuario(uid){
+
+  try {
+
+    const preferencias =
+      await FirebaseAPI.getAll('preferencias_usuario');
+
+    const dados =
+      preferencias.find(
+        p => p.id === uid
+      );
+
+    HIDDEN_PROCESSOS[uid] =
+      dados?.ocultos || [];
+
+    console.log(
+      '👁️ Preferências carregadas:',
+      HIDDEN_PROCESSOS[uid]
+    );
+
+  } catch(erro){
+
+    console.error(
+      'Erro ao carregar preferências do usuário:',
+      erro
+    );
+
+    HIDDEN_PROCESSOS[uid] = [];
+  }
+}
 async function toggleOcultarProcesso(id){
 
   const uid = currentUser.id;
@@ -2234,6 +2265,8 @@ async function handleLogin(e){
     console.log('🔥 Perfil encontrado:', user);
 
     currentUser = user;
+
+    await carregarPreferenciasUsuario(currentUser.id);
 
     document.title = 'Orion';
 
