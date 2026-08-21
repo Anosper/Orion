@@ -1891,10 +1891,21 @@ async function carregarPreferenciasUsuario(uid){
     const preferencias =
       await FirebaseAPI.getAll('preferencias_usuario');
 
+    console.log(
+      '📦 Preferências recebidas do Firebase:',
+      preferencias
+    );
+
     const dados =
       preferencias.find(
         p => p.id === uid
       );
+
+    console.log(
+      '🔎 Preferência encontrada para o UID:',
+      uid,
+      dados
+    );
 
     HIDDEN_PROCESSOS[uid] =
       dados?.ocultos || [];
@@ -1907,7 +1918,7 @@ async function carregarPreferenciasUsuario(uid){
   } catch(erro){
 
     console.error(
-      'Erro ao carregar preferências do usuário:',
+      '❌ Erro ao carregar preferências:',
       erro
     );
 
@@ -2266,7 +2277,14 @@ async function handleLogin(e){
 
     currentUser = user;
 
+    console.log('👤 UID atual:', currentUser.id);
+
     await carregarPreferenciasUsuario(currentUser.id);
+
+    console.log(
+      '👁️ HIDDEN_PROCESSOS após carregar:',
+      HIDDEN_PROCESSOS[currentUser.id]
+    );
 
     document.title = 'Orion';
 
