@@ -1637,12 +1637,19 @@ function iniciarListenerUsuarios(){
 
         if(usuarioAtualizado){
 
+          const eraAdmin =
+            currentUser.perfil === 'admin';
+
           currentUser = {
             ...currentUser,
             ...usuarioAtualizado
           };
 
-          // Atualiza nome/avatar/cargo imediatamente
+          const deixouDeSerAdmin =
+            eraAdmin &&
+            currentUser.perfil !== 'admin';
+
+          // Atualiza nome/avatar/cargo
           const avatar =
             document.getElementById('topbar-avatar');
 
@@ -1672,13 +1679,32 @@ function iniciarListenerUsuarios(){
                 : 'Usuário';
           }
 
-          // Atualiza permissões/menus
-          document.getElementById('gestao-wrap').style.display =
-            currentUser.perfil === 'admin'
-              ? 'block'
-              : 'none';
+          // Atualiza o menu de Gestão
+          const gestaoWrap =
+            document.getElementById('gestao-wrap');
+
+          if(gestaoWrap){
+            gestaoWrap.style.display =
+              currentUser.perfil === 'admin'
+                ? 'block'
+                : 'none';
+          }
 
           applySidebarState();
+
+          // Se perdeu o cargo de administrador
+          // enquanto estava em uma tela exclusiva de admin,
+          // volta automaticamente para Processos.
+          if(
+            deixouDeSerAdmin &&
+            (
+              currentView === 'usuarios' ||
+              currentView === 'credenciais'
+            )
+          ){
+            navigate('processos');
+          }
+
         }
       }
 
